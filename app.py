@@ -3,65 +3,135 @@ import pandas as pd
 import plotly.express as px
 from typing import Optional
 
-# =========================
-# PAGE CONFIG & GLOBAL CSS
-# =========================
+# ==============================
+# PAGE CONFIG & GLOBAL STYLING
+# ==============================
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
     layout="wide",
 )
 
-CSS = """
-<style>
-.main .block-container {
-    max-width: 1500px;
-    padding-top: 0.4rem;
-    padding-bottom: 1.5rem;
-}
+st.markdown(
+    """
+    <style>
+    .main .block-container {
+        max-width: 1500px;
+        padding-top: 0.4rem;
+        padding-bottom: 2rem;
+    }
 
-.app-title {
-    margin-top: 0.3rem;
-    margin-bottom: 0.6rem;
-}
+    .app-title {
+        margin-left: 4.0rem;  /* leave space for left menu */
+        margin-top: 0.4rem;
+        margin-bottom: 0.4rem;
+    }
 
-.card {
-    background-color: rgba(255,255,255,0.03);
-    padding: 1.0rem 1.2rem;
-    border-radius: 0.9rem;
-    border: 1px solid rgba(255,255,255,0.10);
-}
-</style>
-"""
-st.markdown(CSS, unsafe_allow_html=True)
+    .card {
+        background-color: rgba(255,255,255,0.03);
+        padding: 1.0rem 1.2rem;
+        border-radius: 0.9rem;
+        border: 1px solid rgba(255,255,255,0.10);
+    }
 
+    /* ======== FIXED LEFT MENU (does NOT push content) ======== */
+    .menu-fixed {
+        position: fixed;
+        left: 0.6rem;
+        top: 4.3rem;
+        z-index: 1000;
+    }
 
-# ==============
-# DATA HELPERS
-# ==============
+    .menu-toggle .stButton > button {
+        font-size: 1.6rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.7rem;
+        border: 1px solid rgba(255,255,255,0.35);
+    }
+
+    .menu-container-vertical {
+        margin-top: 0.4rem;
+    }
+
+    .menu-container-vertical .stButton > button {
+        width: 3.0rem;
+        height: 3.0rem;
+        display: block;
+        border-radius: 0.9rem;
+        font-size: 1.6rem;
+        border: 1px solid rgba(255,255,255,0.25);
+        position: relative;
+        margin-bottom: 0.4rem;
+    }
+
+    /* Tooltip base */
+    .menu-container-vertical .stButton > button::after {
+        position: absolute;
+        top: 50%;
+        left: 115%;
+        transform: translateY(-50%);
+        background: rgba(15,15,15,0.95);
+        color: #fff;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.4rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease-in-out;
+        z-index: 9999;
+    }
+    .menu-container-vertical .stButton > button:hover::after {
+        opacity: 1;
+    }
+
+    /* Tooltip labels per icon (top to bottom) */
+    .menu-container-vertical .stButton:nth-of-type(1) > button::after {
+        content: "Global Map";
+    }
+    .menu-container-vertical .stButton:nth-of-type(2) > button::after {
+        content: "AQI Summary";
+    }
+    .menu-container-vertical .stButton:nth-of-type(3) > button::after {
+        content: "Country Pollutants";
+    }
+    .menu-container-vertical .stButton:nth-of-type(4) > button::after {
+        content: "PM2.5 Trends";
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ==============================
+# HELPER: CLEAN COLUMN NAMES
+# ==============================
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df.columns = [
         c.strip()
-         .lower()
-         .replace(" ", "_")
-         .replace(".", "_")
+        .lower()
+        .replace(" ", "_")
+        .replace(".", "_")
         for c in df.columns
     ]
     return df
 
 
+# ==============================
+# DATA LOADING
+# ==============================
+
 @st.cache_data
-def load_aqi_data(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
+def load_aqi_data() -> pd.DataFrame:
+    df = pd.read_csv("data/raw/global_air_pollution.csv")
     df = clean_columns(df)
 
     if "country" in df.columns:
         df = df.dropna(subset=["country"])
         df["country"] = df["country"].astype(str)
 
-    # force numeric on AQI columns
     for col in df.columns:
         if col.endswith("aqi_value") or col == "aqi_value":
             df[col] = pd.to_numeric(df[col], errors="coerce")
@@ -73,28 +143,24 @@ def load_aqi_data(path: str) -> pd.DataFrame:
 
 
 @st.cache_data
-def load_pm25_data(path: str) -> pd.DataFrame:
-    df = pd.read_csv(path)
+def load_pm25_data() -> pd.DataFrame:
+    df = pd.read_csv("data/raw/pm25-air-pollution.csv")
     df = clean_columns(df)
 
     if "entity" in df.columns:
         df = df.rename(columns={"entity": "country"})
-
-    # normalise pm25 column name
     if "pm2_5" in df.columns:
         df = df.rename(columns={"pm2_5": "pm25"})
     elif "pm25" not in df.columns:
-        pm_cols = [c for c in df.columns if "pm2" in c]
-        if pm_cols:
-            df = df.rename(columns={pm_cols[0]: "pm25"})
+        possible_pm_cols = [c for c in df.columns if "pm2" in c]
+        if possible_pm_cols:
+            df = df.rename(columns={possible_pm_cols[0]: "pm25"})
 
     df["year"] = pd.to_numeric(df.get("year", pd.NA), errors="coerce")
     df["pm25"] = pd.to_numeric(df.get("pm25", pd.NA), errors="coerce")
 
     df = df.dropna(subset=["country", "year", "pm25"])
     df["country"] = df["country"].astype(str)
-
-    # keep 2010–2019 like we discussed
     df = df[(df["year"] >= 2010) & (df["year"] <= 2019)]
     return df
 
@@ -112,18 +178,17 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
     return merged
 
 
-# ==============
-# VIEW 1: MAP
-# ==============
+# ==============================
+# GLOBAL MAP (HERO VIEW)
+# ==============================
 
-def view_global_map(aqi_df: pd.DataFrame):
+def show_global_map(aqi_df: pd.DataFrame):
     st.subheader("🗺 Global Air Pollution Map (Interactive)")
 
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
         return
 
-    # available metrics
     metric_options = {}
     if "aqi_value" in aqi_df.columns:
         metric_options["Overall AQI Value"] = "aqi_value"
@@ -137,23 +202,27 @@ def view_global_map(aqi_df: pd.DataFrame):
         st.warning("No AQI metric columns found for mapping.")
         return
 
-    # layout: controls vs map
-    controls_col, map_col = st.columns([1.1, 4.9])
+    # Make controls a bit narrower so map can be wider
+    left_col, right_col = st.columns([1.0, 4.5])
 
-    with controls_col:
+    # LEFT CONTROLS
+    with left_col:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.markdown("#### Settings")
 
-        metric_label = st.selectbox("Pollution metric", list(metric_options.keys()))
+        metric_label = st.selectbox(
+            "Pollution metric",
+            list(metric_options.keys()),
+        )
         metric_col = metric_options[metric_label]
 
         cat_filter = None
         if "aqi_category" in aqi_df.columns:
-            cats = sorted(aqi_df["aqi_category"].dropna().unique().tolist())
+            categories = sorted(aqi_df["aqi_category"].dropna().unique().tolist())
             cat_filter = st.multiselect(
                 "AQI Category",
-                options=cats,
-                default=cats,
+                options=categories,
+                default=categories,
             )
 
         metric_series = pd.to_numeric(aqi_df[metric_col], errors="coerce")
@@ -169,7 +238,7 @@ def view_global_map(aqi_df: pd.DataFrame):
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # apply filters
+    # FILTERED DATA
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -186,10 +255,11 @@ def view_global_map(aqi_df: pd.DataFrame):
         .rename(columns={metric_col: "metric_value"})
     )
 
-    with map_col:
+    # RIGHT MAP
+    with right_col:
         st.markdown(
             f"""
-            <p style="text-align:center; font-weight:600; margin:0.2rem 0 0.4rem 0;">
+            <p style="text-align:center; font-weight:600; margin-bottom:0.3rem;">
                 Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}
             </p>
             """,
@@ -202,8 +272,8 @@ def view_global_map(aqi_df: pd.DataFrame):
             locationmode="country names",
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
+            height=820,
             color_continuous_scale="Blues",
-            height=720,
         )
 
         fig.update_geos(
@@ -213,12 +283,12 @@ def view_global_map(aqi_df: pd.DataFrame):
         )
 
         fig.update_layout(
-            margin=dict(l=0, r=10, t=0, b=0),
+            margin=dict(l=0, r=0, t=0, b=0),
             coloraxis_colorbar=dict(
                 orientation="h",
-                y=-0.21,
-                thickness=16,
-                len=0.88,
+                y=-0.20,
+                thickness=14,
+                len=0.85,
                 title=metric_label,
             ),
         )
@@ -232,15 +302,17 @@ def view_global_map(aqi_df: pd.DataFrame):
         )
 
 
-# ==============
-# VIEW 2: SUMMARY
-# ==============
+# ==============================
+# SUMMARY VIEW
+# ==============================
 
-def view_summary(aqi_df: pd.DataFrame):
+def show_data_preview(aqi_df: pd.DataFrame):
     st.subheader("📊 AQI Summary – Dataset Preview")
     st.write(f"Total rows: **{aqi_df.shape[0]}**")
-    st.dataframe(aqi_df.head(), use_container_width=True)
+    st.dataframe(aqi_df.head())
 
+
+def show_top_polluted(aqi_df: pd.DataFrame):
     st.subheader("🔥 Top 10 Most Polluted Countries (Average Overall AQI)")
 
     if "country" not in aqi_df.columns or "aqi_value" not in aqi_df.columns:
@@ -259,16 +331,17 @@ def view_summary(aqi_df: pd.DataFrame):
         x="country",
         y="aqi_value",
         labels={"aqi_value": "Average AQI"},
+        title="",
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=10, b=50))
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig, width="stretch")
 
 
-# ==============
-# VIEW 3: COUNTRY POLLUTANTS
-# ==============
+# ==============================
+# COUNTRY POLLUTANTS VIEW
+# ==============================
 
-def view_country_pollutants(aqi_df: pd.DataFrame):
+def show_country_pollutants(aqi_df: pd.DataFrame):
     st.subheader("🏙 Country-Level Pollutant Breakdown")
 
     if "country" not in aqi_df.columns:
@@ -300,20 +373,16 @@ def view_country_pollutants(aqi_df: pd.DataFrame):
         labels={"average_aqi": "AQI"},
         title=f"Average pollutant AQI in {selected}",
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=40, b=60))
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(fig, width="stretch")
 
 
-# ==============
-# VIEW 4: PM2.5 TRENDS
-# ==============
+# ==============================
+# PM2.5 TRENDS VIEW
+# ==============================
 
-def view_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
+def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
     st.subheader("📈 PM2.5 Exposure Trend (2010–2019)")
-
-    if pm_df.empty:
-        st.info("PM2.5 dataset not available.")
-        return
 
     countries = sorted(pm_df["country"].unique())
     default_selection = (
@@ -339,10 +408,11 @@ def view_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
         x="year",
         y="pm25",
         color="country",
+        title="PM2.5 Levels Over Time (2010–2019)",
         labels={"pm25": "PM2.5 (μg/m³)", "year": "Year"},
     )
-    fig.update_layout(margin=dict(l=10, r=10, t=40, b=60))
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=40, b=10))
+    st.plotly_chart(fig, width="stretch")
 
     if merged_df is not None and "mean_aqi_value" in merged_df.columns:
         st.subheader("PM2.5 vs Mean AQI (latest available year)")
@@ -360,56 +430,65 @@ def view_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
                 y="mean_aqi_value",
                 text="country",
                 labels={"pm25": "PM2.5 (μg/m³)", "mean_aqi_value": "Mean AQI"},
+                title="",
             )
             fig2.update_traces(textposition="top center")
-            fig2.update_layout(margin=dict(l=10, r=10, t=10, b=60))
-            st.plotly_chart(fig2, use_container_width=True)
+            fig2.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig2, width="stretch")
 
 
-# ==============
-# MAIN
-# ==============
+# ==============================
+# MAIN APP WITH FIXED VERTICAL ICON NAV
+# ==============================
 
 def main():
+    if "active_view" not in st.session_state:
+        st.session_state["active_view"] = "map"
+    if "menu_open" not in st.session_state:
+        st.session_state["menu_open"] = True
+
+    # TITLE (aligned with content, menu sits separately on the far left)
     st.markdown("<h1 class='app-title'>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
 
-    # sidebar icon menu (doesn't push layout)
-    view_choice = st.sidebar.radio(
-        "Views",
-        options=["map", "summary", "country", "pm25"],
-        format_func=lambda x: {
-            "map": "🗺  Global Map",
-            "summary": "📊  AQI Summary",
-            "country": "🏙  Country Pollutants",
-            "pm25": "📈  PM2.5 Trends",
-        }[x],
-    )
+    # FIXED LEFT MENU (does not push content)
+    st.markdown("<div class='menu-fixed'>", unsafe_allow_html=True)
 
-    # safe data loading
-    try:
-        aqi_df = load_aqi_data("data/raw/global_air_pollution.csv")
-    except Exception as e:
-        st.error(f"Could not load `data/raw/global_air_pollution.csv`: {e}")
-        return
+    st.markdown("<div class='menu-toggle'>", unsafe_allow_html=True)
+    if st.button("☰", key="menu_toggle_title"):
+        st.session_state["menu_open"] = not st.session_state["menu_open"]
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    try:
-        pm_df = load_pm25_data("data/raw/pm25-air-pollution.csv")
-    except Exception as e:
-        st.warning(f"PM2.5 dataset could not be loaded (`data/raw/pm25-air-pollution.csv`): {e}")
-        pm_df = pd.DataFrame()
-        merged_df = None
-    else:
-        merged_df = get_merged_pm25_aqi(aqi_df, pm_df)
+    if st.session_state["menu_open"]:
+        st.markdown("<div class='menu-container-vertical'>", unsafe_allow_html=True)
+        if st.button("🗺", key="nav_map"):
+            st.session_state["active_view"] = "map"
+        if st.button("📊", key="nav_summary"):
+            st.session_state["active_view"] = "summary"
+        if st.button("🏙", key="nav_country"):
+            st.session_state["active_view"] = "country"
+        if st.button("📈", key="nav_pm25"):
+            st.session_state["active_view"] = "pm25"
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # route views
-    if view_choice == "map":
-        view_global_map(aqi_df)
-    elif view_choice == "summary":
-        view_summary(aqi_df)
-    elif view_choice == "country":
-        view_country_pollutants(aqi_df)
-    elif view_choice == "pm25":
-        view_pm25_trends(pm_df, merged_df)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # LOAD DATA
+    aqi_df = load_aqi_data()
+    pm_df = load_pm25_data()
+    merged_df = get_merged_pm25_aqi(aqi_df, pm_df)
+
+    view = st.session_state["active_view"]
+
+    # ROUTING
+    if view == "map":
+        show_global_map(aqi_df)
+    elif view == "summary":
+        show_data_preview(aqi_df)
+        show_top_polluted(aqi_df)
+    elif view == "country":
+        show_country_pollutants(aqi_df)
+    elif view == "pm25":
+        show_pm25_trends(pm_df, merged_df)
 
 
 if __name__ == "__main__":
