@@ -15,15 +15,16 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Reduce top padding & widen content */
     .main .block-container {
         max-width: 1500px;
-        padding-top: 0.5rem;
+        padding-top: 0.4rem;
         padding-bottom: 2rem;
     }
 
-    h1 {
-        margin-bottom: 0.4rem !important;
+    .app-title {
+        margin-left: 4.0rem;  /* leave space for left menu */
+        margin-top: 0.4rem;
+        margin-bottom: 0.4rem;
     }
 
     .card {
@@ -33,7 +34,14 @@ st.markdown(
         border: 1px solid rgba(255,255,255,0.10);
     }
 
-    /* ======== MENU BUTTON (beside title) ======== */
+    /* ======== FIXED LEFT MENU (does NOT push content) ======== */
+    .menu-fixed {
+        position: fixed;
+        left: 0.6rem;
+        top: 4.3rem;
+        z-index: 1000;
+    }
+
     .menu-toggle .stButton > button {
         font-size: 1.6rem;
         padding: 0.35rem 0.75rem;
@@ -41,7 +49,6 @@ st.markdown(
         border: 1px solid rgba(255,255,255,0.35);
     }
 
-    /* ======== VERTICAL ICON MENU (under button) ======== */
     .menu-container-vertical {
         margin-top: 0.4rem;
     }
@@ -91,7 +98,6 @@ st.markdown(
     .menu-container-vertical .stButton:nth-of-type(4) > button::after {
         content: "PM2.5 Trends";
     }
-
     </style>
     """,
     unsafe_allow_html=True,
@@ -196,7 +202,8 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.warning("No AQI metric columns found for mapping.")
         return
 
-    left_col, right_col = st.columns([1.2, 3.8])
+    # Make controls a bit narrower so map can be wider
+    left_col, right_col = st.columns([1.0, 4.5])
 
     # LEFT CONTROLS
     with left_col:
@@ -252,7 +259,7 @@ def show_global_map(aqi_df: pd.DataFrame):
     with right_col:
         st.markdown(
             f"""
-            <p style="text-align:center; font-weight:600; margin-bottom:0.4rem;">
+            <p style="text-align:center; font-weight:600; margin-bottom:0.3rem;">
                 Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}
             </p>
             """,
@@ -265,7 +272,7 @@ def show_global_map(aqi_df: pd.DataFrame):
             locationmode="country names",
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
-            height=900,
+            height=820,
             color_continuous_scale="Blues",
         )
 
@@ -431,7 +438,7 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
 
 
 # ==============================
-# MAIN APP WITH VERTICAL ICON NAV
+# MAIN APP WITH FIXED VERTICAL ICON NAV
 # ==============================
 
 def main():
@@ -440,30 +447,30 @@ def main():
     if "menu_open" not in st.session_state:
         st.session_state["menu_open"] = True
 
-    # TITLE + HAMBURGER
-    btn_col, title_col = st.columns([0.06, 0.94])
+    # TITLE (aligned with content, menu sits separately on the far left)
+    st.markdown("<h1 class='app-title'>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
 
-    with btn_col:
-        st.markdown("<div class='menu-toggle'>", unsafe_allow_html=True)
-        if st.button("☰", key="menu_toggle_title"):
-            st.session_state["menu_open"] = not st.session_state["menu_open"]
+    # FIXED LEFT MENU (does not push content)
+    st.markdown("<div class='menu-fixed'>", unsafe_allow_html=True)
+
+    st.markdown("<div class='menu-toggle'>", unsafe_allow_html=True)
+    if st.button("☰", key="menu_toggle_title"):
+        st.session_state["menu_open"] = not st.session_state["menu_open"]
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if st.session_state["menu_open"]:
+        st.markdown("<div class='menu-container-vertical'>", unsafe_allow_html=True)
+        if st.button("🗺", key="nav_map"):
+            st.session_state["active_view"] = "map"
+        if st.button("📊", key="nav_summary"):
+            st.session_state["active_view"] = "summary"
+        if st.button("🏙", key="nav_country"):
+            st.session_state["active_view"] = "country"
+        if st.button("📈", key="nav_pm25"):
+            st.session_state["active_view"] = "pm25"
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # VERTICAL ICON MENU UNDER BUTTON
-        if st.session_state["menu_open"]:
-            st.markdown("<div class='menu-container-vertical'>", unsafe_allow_html=True)
-            if st.button("🗺", key="nav_map"):
-                st.session_state["active_view"] = "map"
-            if st.button("📊", key="nav_summary"):
-                st.session_state["active_view"] = "summary"
-            if st.button("🏙", key="nav_country"):
-                st.session_state["active_view"] = "country"
-            if st.button("📈", key="nav_pm25"):
-                st.session_state["active_view"] = "pm25"
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    with title_col:
-        st.markdown("<h1>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
     # LOAD DATA
     aqi_df = load_aqi_data()
