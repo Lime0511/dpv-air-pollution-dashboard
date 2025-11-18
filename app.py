@@ -3,11 +3,41 @@ import pandas as pd
 import plotly.express as px
 from typing import Optional
 
-# ---------- PAGE CONFIG ----------
+# ---------- PAGE CONFIG & GLOBAL STYLING ----------
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
     layout="wide",
+)
+
+# Global CSS: tighten layout, nicer cards
+st.markdown(
+    """
+    <style>
+    /* Center content and reduce side padding */
+    .main .block-container {
+        max-width: 1400px;
+        padding-top: 1.5rem;
+        padding-bottom: 2rem;
+    }
+    /* Nicer tab bar spacing */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.5rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding-top: 0.4rem;
+        padding-bottom: 0.4rem;
+    }
+    /* Reusable card style */
+    .card {
+        background-color: rgba(255,255,255,0.03);
+        padding: 1.0rem 1.2rem;
+        border-radius: 0.9rem;
+        border: 1px solid rgba(255,255,255,0.10);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -85,21 +115,7 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
 # ---------- GLOBAL MAP (HERO TAB) ----------
 
 def show_global_map(aqi_df: pd.DataFrame):
-    # *** No extra widgets above columns – prevents weird empty boxes ***
-    # Small CSS to make left panel look like a proper control box
-    st.markdown(
-        """
-        <style>
-        .control-panel {
-            background-color: rgba(255,255,255,0.03);
-            padding: 1.0rem 1.2rem;
-            border-radius: 0.9rem;
-            border: 1px solid rgba(255,255,255,0.10);
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.subheader("🗺 Global Air Pollution Map (Interactive)")
 
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
@@ -124,7 +140,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 
     # ---------- LEFT: SETTINGS PANEL ----------
     with left_col:
-        st.markdown("<div class='control-panel'>", unsafe_allow_html=True)
+        st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.markdown("#### Settings")
 
         metric_label = st.selectbox(
@@ -174,7 +190,6 @@ def show_global_map(aqi_df: pd.DataFrame):
 
     # ---------- RIGHT: BIG MAP ----------
     with right_col:
-        st.markdown("### Global Air Pollution Map")
         st.markdown(
             f"**Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}**"
         )
@@ -186,8 +201,8 @@ def show_global_map(aqi_df: pd.DataFrame):
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
             height=620,
-            # red = bad, green = good (like many health maps)
-            color_continuous_scale="RdYlGn_r",
+            # clean blue palette (similar vibe to ref)
+            color_continuous_scale="Blues",
         )
 
         fig.update_geos(
@@ -207,7 +222,7 @@ def show_global_map(aqi_df: pd.DataFrame):
             ),
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # ---------- TABLE UNDER WHOLE SECTION ----------
     with st.expander("Show aggregated data table"):
@@ -220,13 +235,13 @@ def show_global_map(aqi_df: pd.DataFrame):
 # ---------- SUMMARY TAB ----------
 
 def show_data_preview(aqi_df: pd.DataFrame):
-    st.subheader("AQI Dataset Preview")
-    st.write(f"Total rows: {aqi_df.shape[0]}")
+    st.subheader("📄 AQI Dataset Preview")
+    st.write(f"Total rows: **{aqi_df.shape[0]}**")
     st.dataframe(aqi_df.head())
 
 
 def show_top_polluted(aqi_df: pd.DataFrame):
-    st.subheader("Top 10 Most Polluted Countries (by Overall AQI)")
+    st.subheader("🔥 Top 10 Most Polluted Countries (Average Overall AQI)")
 
     if "country" not in aqi_df.columns or "aqi_value" not in aqi_df.columns:
         st.info("Columns 'country' or 'aqi_value' not found.")
@@ -244,15 +259,16 @@ def show_top_polluted(aqi_df: pd.DataFrame):
         x="country",
         y="aqi_value",
         labels={"aqi_value": "Average AQI"},
-        title="Top 10 Countries by Average AQI",
+        title="",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+    st.plotly_chart(fig, width="stretch")
 
 
 # ---------- COUNTRY POLLUTANTS TAB ----------
 
 def show_country_pollutants(aqi_df: pd.DataFrame):
-    st.subheader("Pollutant Breakdown by Country")
+    st.subheader("🏙 Country-Level Pollutant Breakdown")
 
     if "country" not in aqi_df.columns:
         st.info("Column 'country' not found.")
@@ -283,13 +299,14 @@ def show_country_pollutants(aqi_df: pd.DataFrame):
         labels={"average_aqi": "AQI"},
         title=f"Average pollutant AQI in {selected}",
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=30, b=10))
+    st.plotly_chart(fig, width="stretch")
 
 
 # ---------- PM2.5 TRENDS TAB ----------
 
 def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
-    st.subheader("PM2.5 Exposure Trend (2010–2019)")
+    st.subheader("📈 PM2.5 Exposure Trend (2010–2019)")
 
     countries = sorted(pm_df["country"].unique())
     default_selection = ["India", "China"] if "India" in countries and "China" in countries else countries[:2]
@@ -314,7 +331,8 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
         title="PM2.5 Levels Over Time (2010–2019)",
         labels={"pm25": "PM2.5 (μg/m³)", "year": "Year"},
     )
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_layout(margin=dict(l=10, r=10, t=40, b=10))
+    st.plotly_chart(fig, width="stretch")
 
     if merged_df is not None and "mean_aqi_value" in merged_df.columns:
         st.subheader("PM2.5 vs Mean AQI (latest available year)")
@@ -332,10 +350,11 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
                 y="mean_aqi_value",
                 text="country",
                 labels={"pm25": "PM2.5 (μg/m³)", "mean_aqi_value": "Mean AQI"},
-                title="PM2.5 vs Mean AQI (Selected Countries)",
+                title="",
             )
             fig2.update_traces(textposition="top center")
-            st.plotly_chart(fig2, use_container_width=True)
+            fig2.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+            st.plotly_chart(fig2, width="stretch")
 
 
 # ---------- MAIN APP ----------
