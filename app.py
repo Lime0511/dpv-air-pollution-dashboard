@@ -3,52 +3,44 @@ import pandas as pd
 import plotly.express as px
 from typing import Optional
 
-# ---------- PAGE CONFIG & GLOBAL STYLING ----------
+# ==============================
+# PAGE CONFIG & GLOBAL STYLING
+# ==============================
 
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
     layout="wide",
 )
 
-# Global CSS: tighter layout, nicer cards
 st.markdown(
     """
     <style>
-    /* Reduce top padding & widen content a bit */
+    /* Reduce top padding & widen content */
     .main .block-container {
         max-width: 1500px;
         padding-top: 0.5rem;
         padding-bottom: 2rem;
     }
 
-    /* Small bottom margin under main title */
     h1 {
         margin-bottom: 0.4rem !important;
     }
 
-    /* Reusable card style for panels */
+    /* Reusable card style */
     .card {
         background-color: rgba(255,255,255,0.03);
         padding: 1.0rem 1.2rem;
         border-radius: 0.9rem;
         border: 1px solid rgba(255,255,255,0.10);
     }
-
-    /* Tighter tab spacing */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0.4rem;
-    }
-    .stTabs [data-baseweb="tab"] {
-        padding-top: 0.35rem;
-        padding-bottom: 0.35rem;
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-
-# ---------- HELPER: CLEAN COLUMN NAMES ----------
+# ==============================
+# HELPER: CLEAN COLUMN NAMES
+# ==============================
 
 def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -62,7 +54,9 @@ def clean_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ---------- DATA LOADING ----------
+# ==============================
+# DATA LOADING
+# ==============================
 
 @st.cache_data
 def load_aqi_data() -> pd.DataFrame:
@@ -119,11 +113,11 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
     return merged
 
 
-# ---------- GLOBAL MAP (HERO TAB) ----------
+# ==============================
+# GLOBAL MAP (HERO VIEW)
+# ==============================
 
 def show_global_map(aqi_df: pd.DataFrame):
-    st.subheader("🗺 Global Air Pollution Map (Interactive)")
-
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
         return
@@ -152,7 +146,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 
         metric_label = st.selectbox(
             "Pollution metric",
-            list(metric_options.keys())
+            list(metric_options.keys()),
         )
         metric_col = metric_options[metric_label]
 
@@ -178,7 +172,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------- FILTER DATA (SHARED) ----------
+    # ---------- FILTER DATA ----------
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -197,8 +191,14 @@ def show_global_map(aqi_df: pd.DataFrame):
 
     # ---------- RIGHT: BIG MAP ----------
     with right_col:
+        # centered status line right above map
         st.markdown(
-            f"**Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}**"
+            f"""
+            <p style="text-align:center; font-weight:600; margin-bottom:0.4rem;">
+                Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}
+            </p>
+            """,
+            unsafe_allow_html=True,
         )
 
         fig = px.choropleth(
@@ -207,7 +207,7 @@ def show_global_map(aqi_df: pd.DataFrame):
             locationmode="country names",
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
-            height=900,                 # << BIG map
+            height=900,  # big, tall map
             color_continuous_scale="Blues",
         )
 
@@ -218,19 +218,19 @@ def show_global_map(aqi_df: pd.DataFrame):
         )
 
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0),   # no wasted border
+            margin=dict(l=0, r=0, t=0, b=0),
             coloraxis_colorbar=dict(
                 orientation="h",
-                y=-0.2,
+                y=-0.20,
                 thickness=14,
                 len=0.85,
                 title=metric_label,
             ),
         )
 
-        st.plotly_chart(fig, width="stretch")   # new API instead of use_container_width
+        st.plotly_chart(fig, width="stretch")
 
-    # ---------- TABLE UNDER WHOLE SECTION ----------
+    # ---------- TABLE ----------
     with st.expander("Show aggregated data table"):
         st.dataframe(
             country_metric.sort_values("metric_value", ascending=False),
@@ -238,7 +238,9 @@ def show_global_map(aqi_df: pd.DataFrame):
         )
 
 
-# ---------- SUMMARY TAB ----------
+# ==============================
+# SUMMARY VIEW
+# ==============================
 
 def show_data_preview(aqi_df: pd.DataFrame):
     st.subheader("📄 AQI Dataset Preview")
@@ -271,7 +273,9 @@ def show_top_polluted(aqi_df: pd.DataFrame):
     st.plotly_chart(fig, width="stretch")
 
 
-# ---------- COUNTRY POLLUTANTS TAB ----------
+# ==============================
+# COUNTRY POLLUTANTS VIEW
+# ==============================
 
 def show_country_pollutants(aqi_df: pd.DataFrame):
     st.subheader("🏙 Country-Level Pollutant Breakdown")
@@ -309,7 +313,9 @@ def show_country_pollutants(aqi_df: pd.DataFrame):
     st.plotly_chart(fig, width="stretch")
 
 
-# ---------- PM2.5 TRENDS TAB ----------
+# ==============================
+# PM2.5 TRENDS VIEW
+# ==============================
 
 def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
     st.subheader("📈 PM2.5 Exposure Trend (2010–2019)")
@@ -363,35 +369,61 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
             st.plotly_chart(fig2, width="stretch")
 
 
-# ---------- MAIN APP ----------
+# ==============================
+# MAIN APP WITH CUSTOM ICON NAV
+# ==============================
 
 def main():
     st.title("🌍 Global Air Pollution Dashboard")
 
+    # Session state for custom navigation
+    if "active_view" not in st.session_state:
+        st.session_state["active_view"] = "map"
+    if "menu_open" not in st.session_state:
+        st.session_state["menu_open"] = True
+
+    # --- NAV ROW (hamburger + icon radio) ---
+    nav_col, _ = st.columns([0.22, 0.78])
+    with nav_col:
+        c1, c2 = st.columns([0.25, 0.75])
+        with c1:
+            if st.button("☰", key="menu_toggle"):
+                st.session_state["menu_open"] = not st.session_state["menu_open"]
+
+        with c2:
+            if st.session_state["menu_open"]:
+                view = st.radio(
+                    "",
+                    ["map", "summary", "country", "pm25"],
+                    index=["map", "summary", "country", "pm25"].index(
+                        st.session_state["active_view"]
+                    ),
+                    format_func=lambda x: {
+                        "map": "🗺 Global Map",
+                        "summary": "📊 AQI Summary",
+                        "country": "🏙 Country Pollutants",
+                        "pm25": "📈 PM2.5 Trends",
+                    }[x],
+                    horizontal=True,
+                )
+                st.session_state["active_view"] = view
+
+    # Load data once
     aqi_df = load_aqi_data()
     pm_df = load_pm25_data()
     merged_df = get_merged_pm25_aqi(aqi_df, pm_df)
 
-    tab_map, tab_summary, tab_country, tab_pm25 = st.tabs(
-        [
-            "🗺 Global Map (Method 2)",
-            "📊 AQI Summary (Method 1)",
-            "🏙 Country Pollutants",
-            "📈 PM2.5 Trends (2010–2019)",
-        ]
-    )
+    view = st.session_state["active_view"]
 
-    with tab_map:
+    if view == "map":
+        st.subheader("🗺 Global Air Pollution Map (Interactive)")
         show_global_map(aqi_df)
-
-    with tab_summary:
+    elif view == "summary":
         show_data_preview(aqi_df)
         show_top_polluted(aqi_df)
-
-    with tab_country:
+    elif view == "country":
         show_country_pollutants(aqi_df)
-
-    with tab_pm25:
+    elif view == "pm25":
         show_pm25_trends(pm_df, merged_df)
 
 
