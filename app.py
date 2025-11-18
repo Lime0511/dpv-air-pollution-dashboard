@@ -1,6 +1,15 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+from typing import Optional
+
+# ---------- PAGE CONFIG (WIDE LAYOUT) ----------
+
+st.set_page_config(
+    page_title="Global Air Pollution Dashboard",
+    layout="wide",
+)
+
 
 # ---------- HELPER: CLEAN COLUMN NAMES ----------
 
@@ -61,7 +70,6 @@ def load_pm25_data() -> pd.DataFrame:
     if "pm2_5" in df.columns:
         df = df.rename(columns={"pm2_5": "pm25"})
     elif "pm25" not in df.columns:
-        # Fallback: if column name is weird, just try to find it
         possible_pm_cols = [c for c in df.columns if "pm2" in c]
         if possible_pm_cols:
             df = df.rename(columns={possible_pm_cols[0]: "pm25"})
@@ -74,27 +82,24 @@ def load_pm25_data() -> pd.DataFrame:
     df = df.dropna(subset=["country", "year", "pm25"])
     df["country"] = df["country"].astype(str)
 
-    # Restrict to 2010–2019 (since that's what your file actually has)
+    # Restrict to 2010–2019 (because that’s what the file actually has)
     df = df[(df["year"] >= 2010) & (df["year"] <= 2019)]
 
     return df
 
 
-def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> pd.DataFrame | None:
+def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[pd.DataFrame]:
     """
-    Merge PM2.5 time-series with country-level mean AQI.
-    This is for extra analysis (e.g. PM2.5 vs AQI scatter).
+    Merge PM2.5 time-series with country-level mean AQI (for scatter plot).
     """
     if "aqi_value" not in aqi_df.columns:
         return None
 
-    # Aggregate AQI snapshot per country
     aqi_country = (
         aqi_df.groupby("country", as_index=False)["aqi_value"]
         .mean()
         .rename(columns={"aqi_value": "mean_aqi_value"})
     )
-
     merged = pm_df.merge(aqi_country, on="country", how="inner")
     return merged
 
@@ -174,6 +179,7 @@ def show_global_map(aqi_df: pd.DataFrame):
         f"(metric: **{metric_label}**, min: **{threshold}**)."
     )
 
+    # Big, tall hero map
     fig = px.choropleth(
         country_metric,
         locations="country",
@@ -181,7 +187,12 @@ def show_global_map(aqi_df: pd.DataFrame):
         color="metric_value",
         labels={"metric_value": metric_label, "country": "Country"},
         title=f"Global Map of {metric_label}",
+        height=650,
     )
+    fig.update_layout(
+        margin=dict(l=0, r=0, t=60, b=0),
+    )
+
     st.plotly_chart(fig, width="stretch")
 
     with st.expander("Show aggregated data table"):
@@ -259,7 +270,7 @@ def show_country_pollutants(aqi_df: pd.DataFrame):
 
 # ---------- VISUAL 4: PM2.5 TRENDS (2010–2019) ----------
 
-def show_pm25_trends(pm_df: pd.DataFrame, merged_df: pd.DataFrame | None):
+def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
     st.subheader("PM2.5 Exposure Trend (2010–2019)")
 
     countries = sorted(pm_df["country"].unique())
