@@ -107,13 +107,13 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
 # ---------- VISUAL 1: GLOBAL MAP (METHOD 2 CORE) ----------
 
 def show_global_map(aqi_df: pd.DataFrame):
-    st.markdown("### 🌍 Global Air Pollution Map (User-Defined Exploration)")
+    st.markdown("### 🌍 Global Air Pollution Map")
 
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
         return
 
-    # Candidate metrics = overall AQI + pollutant AQI subindices
+    # candidate metrics = overall AQI + pollutant AQI subindices
     candidate_metrics = {}
     if "aqi_value" in aqi_df.columns:
         candidate_metrics["Overall AQI Value"] = "aqi_value"
@@ -127,14 +127,30 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.warning("No AQI metric columns found for mapping.")
         return
 
-    # Two-column layout like IHME: left controls, right map
-    controls_col, map_col = st.columns([1, 3])
+    # small CSS so left panel looks more like a proper control box
+    st.markdown(
+        """
+        <style>
+        .control-panel {
+            background-color: rgba(255,255,255,0.02);
+            padding: 1.1rem 1.2rem;
+            border-radius: 0.75rem;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
+    controls_col, map_col = st.columns([1.1, 3.2])
+
+    # ---------- LEFT: CONTROL PANEL ----------
     with controls_col:
-        st.markdown("#### Settings")
+        st.markdown("<div class='control-panel'>", unsafe_allow_html=True)
+        st.markdown("##### Settings")
 
         metric_label = st.selectbox(
-            "Pollution metric to visualise:",
+            "Pollution metric:",
             list(candidate_metrics.keys())
         )
         metric_col = candidate_metrics[metric_label]
@@ -143,7 +159,7 @@ def show_global_map(aqi_df: pd.DataFrame):
         if "aqi_category" in aqi_df.columns:
             categories = sorted(aqi_df["aqi_category"].dropna().unique().tolist())
             category_filter = st.multiselect(
-                "AQI Category (optional):",
+                "AQI Category:",
                 options=categories,
                 default=categories,
             )
@@ -159,7 +175,9 @@ def show_global_map(aqi_df: pd.DataFrame):
             value=float(round(metric_min, 1)),
         )
 
-    # Apply filters (outside columns so both use same filtered data)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ---------- FILTER DATA (shared by map + table) ----------
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -176,10 +194,10 @@ def show_global_map(aqi_df: pd.DataFrame):
         .rename(columns={metric_col: "metric_value"})
     )
 
+    # ---------- RIGHT: MAP ----------
     with map_col:
-        st.write(
-            f"Showing **{len(country_metric)}** countries "
-            f"(metric: **{metric_label}**, min: **{threshold}**)."
+        st.markdown(
+            f"**Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}**"
         )
 
         fig = px.choropleth(
@@ -189,23 +207,28 @@ def show_global_map(aqi_df: pd.DataFrame):
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
             title="",
-            height=650,
+            height=620,
         )
-        # Move colourbar to bottom, remove big margins → more like IHME
+        # Natural earth style + colourbar at bottom (IHME-ish)
+        fig.update_geos(
+            showframe=False,
+            showcoastlines=False,
+            projection_type="natural earth",
+        )
         fig.update_layout(
-            margin=dict(l=0, r=0, t=10, b=0),
+            margin=dict(l=0, r=0, t=0, b=0),
             coloraxis_colorbar=dict(
                 orientation="h",
-                y=-0.15,
+                y=-0.16,
                 thickness=15,
                 len=0.7,
                 title=metric_label,
             ),
         )
 
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
-    # Full-width table underneath
+    # ---------- TABLE UNDER THE WHOLE THING ----------
     with st.expander("Show aggregated data table"):
         st.dataframe(
             country_metric.sort_values("metric_value", ascending=False),
@@ -242,7 +265,7 @@ def show_top_polluted(aqi_df: pd.DataFrame):
         labels={"aqi_value": "Average AQI"},
         title="Top 10 Countries by Average AQI",
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------- VISUAL 3: COUNTRY POLLUTANT BREAKDOWN ----------
@@ -279,7 +302,7 @@ def show_country_pollutants(aqi_df: pd.DataFrame):
         labels={"average_aqi": "AQI"},
         title=f"Average pollutant AQI in {selected_country}",
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------- VISUAL 4: PM2.5 TRENDS (2010–2019) ----------
@@ -310,7 +333,7 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
         title="PM2.5 Levels Over Time (2010–2019)",
         labels={"pm25": "PM2.5 (μg/m³)", "year": "Year"},
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     # Optional: show relationship between PM2.5 and AQI snapshot
     if merged_df is not None and "mean_aqi_value" in merged_df.columns:
@@ -332,7 +355,7 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
                 title="PM2.5 vs Mean AQI (Selected Countries)",
             )
             fig2.update_traces(textposition="top center")
-            st.plotly_chart(fig2, width="stretch")
+            st.plotly_chart(fig2, use_container_width=True)
 
 
 # ---------- APP ENTRY POINT ----------
