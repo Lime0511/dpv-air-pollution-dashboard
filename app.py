@@ -10,30 +10,37 @@ st.set_page_config(
     layout="wide",
 )
 
-# Global CSS: tighten layout, nicer cards
+# Global CSS: tighter layout, nicer cards
 st.markdown(
     """
     <style>
-    /* Center content and reduce side padding */
+    /* Reduce top padding & widen content a bit */
     .main .block-container {
-        max-width: 1400px;
-        padding-top: 1.5rem;
+        max-width: 1500px;
+        padding-top: 0.5rem;
         padding-bottom: 2rem;
     }
-    /* Nicer tab bar spacing */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0.5rem;
+
+    /* Small bottom margin under main title */
+    h1 {
+        margin-bottom: 0.4rem !important;
     }
-    .stTabs [data-baseweb="tab"] {
-        padding-top: 0.4rem;
-        padding-bottom: 0.4rem;
-    }
-    /* Reusable card style */
+
+    /* Reusable card style for panels */
     .card {
         background-color: rgba(255,255,255,0.03);
         padding: 1.0rem 1.2rem;
         border-radius: 0.9rem;
         border: 1px solid rgba(255,255,255,0.10);
+    }
+
+    /* Tighter tab spacing */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0.4rem;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
     }
     </style>
     """,
@@ -200,8 +207,7 @@ def show_global_map(aqi_df: pd.DataFrame):
             locationmode="country names",
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
-            height=620,
-            # clean blue palette (similar vibe to ref)
+            height=900,                 # << BIG map
             color_continuous_scale="Blues",
         )
 
@@ -212,17 +218,17 @@ def show_global_map(aqi_df: pd.DataFrame):
         )
 
         fig.update_layout(
-            margin=dict(l=0, r=0, t=10, b=0),
+            margin=dict(l=0, r=0, t=0, b=0),   # no wasted border
             coloraxis_colorbar=dict(
                 orientation="h",
-                y=-0.18,
-                thickness=12,
-                len=0.8,
+                y=-0.2,
+                thickness=14,
+                len=0.85,
                 title=metric_label,
             ),
         )
 
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width="stretch")   # new API instead of use_container_width
 
     # ---------- TABLE UNDER WHOLE SECTION ----------
     with st.expander("Show aggregated data table"):
