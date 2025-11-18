@@ -49,7 +49,7 @@ def load_aqi_data() -> pd.DataFrame:
 @st.cache_data
 def load_pm25_data() -> pd.DataFrame:
     df = pd.read_csv("data/raw/pm25-air-pollution.csv")
-    df = clean_columns(df)   # expected: entity, code, year, pm2_5
+    df = clean_columns(df)
 
     if "entity" in df.columns:
         df = df.rename(columns={"entity": "country"})
@@ -65,7 +65,6 @@ def load_pm25_data() -> pd.DataFrame:
 
     df = df.dropna(subset=["country", "year", "pm25"])
     df["country"] = df["country"].astype(str)
-
     df = df[(df["year"] >= 2010) & (df["year"] <= 2019)]
     return df
 
@@ -86,27 +85,8 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
 # ---------- GLOBAL MAP (HERO TAB) ----------
 
 def show_global_map(aqi_df: pd.DataFrame):
-    st.markdown("### Global Map")
-
-    if "country" not in aqi_df.columns:
-        st.warning("No 'country' column found in AQI dataset.")
-        return
-
-    # Which metrics can we map?
-    metric_options = {}
-    if "aqi_value" in aqi_df.columns:
-        metric_options["Overall AQI Value"] = "aqi_value"
-
-    for col in aqi_df.columns:
-        if col.endswith("_aqi_value") and col != "aqi_value":
-            label = col.replace("_aqi_value", "").upper().replace("_", " ") + " AQI"
-            metric_options[label] = col
-
-    if not metric_options:
-        st.warning("No AQI metric columns found for mapping.")
-        return
-
-    # Light CSS for a more polished control card
+    # *** No extra widgets above columns – prevents weird empty boxes ***
+    # Small CSS to make left panel look like a proper control box
     st.markdown(
         """
         <style>
@@ -121,12 +101,31 @@ def show_global_map(aqi_df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
-    left_col, right_col = st.columns([1, 3.5])
+    if "country" not in aqi_df.columns:
+        st.warning("No 'country' column found in AQI dataset.")
+        return
 
-    # ---------- LEFT: SETTINGS ----------
+    # Metrics that can be mapped
+    metric_options = {}
+    if "aqi_value" in aqi_df.columns:
+        metric_options["Overall AQI Value"] = "aqi_value"
+
+    for col in aqi_df.columns:
+        if col.endswith("_aqi_value") and col != "aqi_value":
+            label = col.replace("_aqi_value", "").upper().replace("_", " ") + " AQI"
+            metric_options[label] = col
+
+    if not metric_options:
+        st.warning("No AQI metric columns found for mapping.")
+        return
+
+    # Main split: left = controls, right = map
+    left_col, right_col = st.columns([1.2, 3.8])
+
+    # ---------- LEFT: SETTINGS PANEL ----------
     with left_col:
         st.markdown("<div class='control-panel'>", unsafe_allow_html=True)
-        st.markdown("**Settings**")
+        st.markdown("#### Settings")
 
         metric_label = st.selectbox(
             "Pollution metric",
@@ -157,7 +156,6 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.markdown("</div>", unsafe_allow_html=True)
 
     # ---------- FILTER DATA (SHARED) ----------
-
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -176,6 +174,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 
     # ---------- RIGHT: BIG MAP ----------
     with right_col:
+        st.markdown("### Global Air Pollution Map")
         st.markdown(
             f"**Showing {len(country_metric)} countries · Metric: {metric_label} · Min: {threshold}**"
         )
@@ -187,7 +186,8 @@ def show_global_map(aqi_df: pd.DataFrame):
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
             height=620,
-            color_continuous_scale="YlGnBu",  # more “health data” style
+            # red = bad, green = good (like many health maps)
+            color_continuous_scale="RdYlGn_r",
         )
 
         fig.update_geos(
@@ -197,7 +197,7 @@ def show_global_map(aqi_df: pd.DataFrame):
         )
 
         fig.update_layout(
-            margin=dict(l=0, r=0, t=0, b=0),
+            margin=dict(l=0, r=0, t=10, b=0),
             coloraxis_colorbar=dict(
                 orientation="h",
                 y=-0.18,
@@ -207,9 +207,9 @@ def show_global_map(aqi_df: pd.DataFrame):
             ),
         )
 
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
-    # ---------- TABLE UNDER MAP ----------
+    # ---------- TABLE UNDER WHOLE SECTION ----------
     with st.expander("Show aggregated data table"):
         st.dataframe(
             country_metric.sort_values("metric_value", ascending=False),
@@ -246,7 +246,7 @@ def show_top_polluted(aqi_df: pd.DataFrame):
         labels={"aqi_value": "Average AQI"},
         title="Top 10 Countries by Average AQI",
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------- COUNTRY POLLUTANTS TAB ----------
@@ -283,7 +283,7 @@ def show_country_pollutants(aqi_df: pd.DataFrame):
         labels={"average_aqi": "AQI"},
         title=f"Average pollutant AQI in {selected}",
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # ---------- PM2.5 TRENDS TAB ----------
@@ -314,7 +314,7 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
         title="PM2.5 Levels Over Time (2010–2019)",
         labels={"pm25": "PM2.5 (μg/m³)", "year": "Year"},
     )
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     if merged_df is not None and "mean_aqi_value" in merged_df.columns:
         st.subheader("PM2.5 vs Mean AQI (latest available year)")
@@ -335,7 +335,7 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
                 title="PM2.5 vs Mean AQI (Selected Countries)",
             )
             fig2.update_traces(textposition="top center")
-            st.plotly_chart(fig2, width="stretch")
+            st.plotly_chart(fig2, use_container_width=True)
 
 
 # ---------- MAIN APP ----------
