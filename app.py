@@ -22,6 +22,7 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
+    /* Title margin */
     h1 {
         margin-bottom: 0.4rem !important;
     }
@@ -33,6 +34,65 @@ st.markdown(
         border-radius: 0.9rem;
         border: 1px solid rgba(255,255,255,0.10);
     }
+
+    /* ======== MENU BUTTON (beside title) ======== */
+    .menu-toggle .stButton > button {
+        font-size: 1.5rem;
+        padding: 0.35rem 0.7rem;
+        border-radius: 0.6rem;
+        border: 1px solid rgba(255,255,255,0.35);
+    }
+
+    /* ======== ICON MENU BAR ======== */
+    .menu-container {
+        margin-top: 0.5rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .menu-container .stButton > button {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.9rem;
+        font-size: 1.6rem;
+        position: relative;
+        border: 1px solid rgba(255,255,255,0.25);
+    }
+
+    /* Tooltip base style */
+    .menu-container .stButton > button::after {
+        position: absolute;
+        top: 115%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(15,15,15,0.95);
+        color: #fff;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.4rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.15s ease-in-out;
+        z-index: 9999;
+    }
+    .menu-container .stButton > button:hover::after {
+        opacity: 1;
+    }
+
+    /* Tooltip text for each icon, using order (1–4) */
+    .menu-container .stButton:nth-of-type(1) > button::after {
+        content: "Global Map";
+    }
+    .menu-container .stButton:nth-of-type(2) > button::after {
+        content: "AQI Summary";
+    }
+    .menu-container .stButton:nth-of-type(3) > button::after {
+        content: "Country Pollutants";
+    }
+    .menu-container .stButton:nth-of-type(4) > button::after {
+        content: "PM2.5 Trends";
+    }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -118,6 +178,8 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
 # ==============================
 
 def show_global_map(aqi_df: pd.DataFrame):
+    st.subheader("🗺 Global Air Pollution Map (Interactive)")
+
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
         return
@@ -243,7 +305,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 # ==============================
 
 def show_data_preview(aqi_df: pd.DataFrame):
-    st.subheader("📄 AQI Dataset Preview")
+    st.subheader("📊 AQI Summary – Dataset Preview")
     st.write(f"Total rows: **{aqi_df.shape[0]}**")
     st.dataframe(aqi_df.head())
 
@@ -370,53 +432,55 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
 
 
 # ==============================
-# MAIN APP WITH CUSTOM ICON NAV
+# MAIN APP WITH ICON NAV
 # ==============================
 
 def main():
-    st.title("🌍 Global Air Pollution Dashboard")
-
-    # Session state for custom navigation
+    # ---- state for nav ----
     if "active_view" not in st.session_state:
         st.session_state["active_view"] = "map"
     if "menu_open" not in st.session_state:
         st.session_state["menu_open"] = True
 
-    # --- NAV ROW (hamburger + icon radio) ---
-    nav_col, _ = st.columns([0.22, 0.78])
-    with nav_col:
-        c1, c2 = st.columns([0.25, 0.75])
+    # ---- TITLE + BIG MENU BUTTON ROW ----
+    title_col_btn, title_col_text = st.columns([0.06, 0.94])
+
+    with title_col_btn:
+        st.markdown("<div class='menu-toggle'>", unsafe_allow_html=True)
+        if st.button("☰", key="menu_toggle_title"):
+            st.session_state["menu_open"] = not st.session_state["menu_open"]
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    with title_col_text:
+        st.markdown("<h1>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
+
+    # ---- ICON MENU BAR (only icons, hover tooltip) ----
+    if st.session_state["menu_open"]:
+        st.markdown("<div class='menu-container'>", unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
         with c1:
-            if st.button("☰", key="menu_toggle"):
-                st.session_state["menu_open"] = not st.session_state["menu_open"]
-
+            if st.button("🗺", key="nav_map"):
+                st.session_state["active_view"] = "map"
         with c2:
-            if st.session_state["menu_open"]:
-                view = st.radio(
-                    "",
-                    ["map", "summary", "country", "pm25"],
-                    index=["map", "summary", "country", "pm25"].index(
-                        st.session_state["active_view"]
-                    ),
-                    format_func=lambda x: {
-                        "map": "🗺 Global Map",
-                        "summary": "📊 AQI Summary",
-                        "country": "🏙 Country Pollutants",
-                        "pm25": "📈 PM2.5 Trends",
-                    }[x],
-                    horizontal=True,
-                )
-                st.session_state["active_view"] = view
+            if st.button("📊", key="nav_summary"):
+                st.session_state["active_view"] = "summary"
+        with c3:
+            if st.button("🏙", key="nav_country"):
+                st.session_state["active_view"] = "country"
+        with c4:
+            if st.button("📈", key="nav_pm25"):
+                st.session_state["active_view"] = "pm25"
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Load data once
+    # ---- LOAD DATA ONCE ----
     aqi_df = load_aqi_data()
     pm_df = load_pm25_data()
     merged_df = get_merged_pm25_aqi(aqi_df, pm_df)
 
     view = st.session_state["active_view"]
 
+    # ---- ROUTE TO ACTIVE VIEW ----
     if view == "map":
-        st.subheader("🗺 Global Air Pollution Map (Interactive)")
         show_global_map(aqi_df)
     elif view == "summary":
         show_data_preview(aqi_df)
