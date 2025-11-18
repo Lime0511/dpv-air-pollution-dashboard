@@ -107,7 +107,7 @@ def get_merged_pm25_aqi(aqi_df: pd.DataFrame, pm_df: pd.DataFrame) -> Optional[p
 # ---------- VISUAL 1: GLOBAL MAP (METHOD 2 CORE) ----------
 
 def show_global_map(aqi_df: pd.DataFrame):
-    st.subheader("🌍 Global Air Pollution Map (User-Defined Exploration)")
+    st.markdown("### 🌍 Global Air Pollution Map (User-Defined Exploration)")
 
     if "country" not in aqi_df.columns:
         st.warning("No 'country' column found in AQI dataset.")
@@ -127,36 +127,39 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.warning("No AQI metric columns found for mapping.")
         return
 
-    # Sidebar controls = user-defined "preprocessing"
-    st.sidebar.markdown("### Map Controls")
-    metric_label = st.sidebar.selectbox(
-        "Pollution metric to visualise:",
-        list(candidate_metrics.keys())
-    )
-    metric_col = candidate_metrics[metric_label]
+    # Two-column layout like IHME: left controls, right map
+    controls_col, map_col = st.columns([1, 3])
 
-    category_filter = None
-    if "aqi_category" in aqi_df.columns:
-        categories = sorted(aqi_df["aqi_category"].dropna().unique().tolist())
-        category_filter = st.sidebar.multiselect(
-            "Filter by AQI Category (optional):",
-            options=categories,
-            default=categories,
+    with controls_col:
+        st.markdown("#### Settings")
+
+        metric_label = st.selectbox(
+            "Pollution metric to visualise:",
+            list(candidate_metrics.keys())
+        )
+        metric_col = candidate_metrics[metric_label]
+
+        category_filter = None
+        if "aqi_category" in aqi_df.columns:
+            categories = sorted(aqi_df["aqi_category"].dropna().unique().tolist())
+            category_filter = st.multiselect(
+                "AQI Category (optional):",
+                options=categories,
+                default=categories,
+            )
+
+        metric_series = pd.to_numeric(aqi_df[metric_col], errors="coerce")
+        metric_min = float(metric_series.min())
+        metric_max = float(metric_series.max())
+
+        threshold = st.slider(
+            f"Minimum {metric_label}:",
+            min_value=float(round(metric_min, 1)),
+            max_value=float(round(metric_max, 1)),
+            value=float(round(metric_min, 1)),
         )
 
-    # Threshold slider
-    metric_series = pd.to_numeric(aqi_df[metric_col], errors="coerce")
-    metric_min = float(metric_series.min())
-    metric_max = float(metric_series.max())
-
-    threshold = st.sidebar.slider(
-        f"Minimum {metric_label}:",
-        min_value=float(round(metric_min, 1)),
-        max_value=float(round(metric_max, 1)),
-        value=float(round(metric_min, 1)),
-    )
-
-    # Apply filters
+    # Apply filters (outside columns so both use same filtered data)
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -166,7 +169,6 @@ def show_global_map(aqi_df: pd.DataFrame):
 
     filtered = filtered[filtered[metric_col] >= threshold]
 
-    # Aggregate by country
     country_metric = (
         filtered
         .groupby("country", as_index=False)[metric_col]
@@ -174,29 +176,41 @@ def show_global_map(aqi_df: pd.DataFrame):
         .rename(columns={metric_col: "metric_value"})
     )
 
-    st.write(
-        f"Showing **{len(country_metric)}** countries after filtering "
-        f"(metric: **{metric_label}**, min: **{threshold}**)."
-    )
+    with map_col:
+        st.write(
+            f"Showing **{len(country_metric)}** countries "
+            f"(metric: **{metric_label}**, min: **{threshold}**)."
+        )
 
-    # Big, tall hero map
-    fig = px.choropleth(
-        country_metric,
-        locations="country",
-        locationmode="country names",
-        color="metric_value",
-        labels={"metric_value": metric_label, "country": "Country"},
-        title=f"Global Map of {metric_label}",
-        height=650,
-    )
-    fig.update_layout(
-        margin=dict(l=0, r=0, t=60, b=0),
-    )
+        fig = px.choropleth(
+            country_metric,
+            locations="country",
+            locationmode="country names",
+            color="metric_value",
+            labels={"metric_value": metric_label, "country": "Country"},
+            title="",
+            height=650,
+        )
+        # Move colourbar to bottom, remove big margins → more like IHME
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=10, b=0),
+            coloraxis_colorbar=dict(
+                orientation="h",
+                y=-0.15,
+                thickness=15,
+                len=0.7,
+                title=metric_label,
+            ),
+        )
 
-    st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width="stretch")
 
+    # Full-width table underneath
     with st.expander("Show aggregated data table"):
-        st.dataframe(country_metric.sort_values("metric_value", ascending=False))
+        st.dataframe(
+            country_metric.sort_values("metric_value", ascending=False),
+            use_container_width=True,
+        )
 
 
 # ---------- VISUAL 2: SNAPSHOT SUMMARY (TOP 10) ----------
