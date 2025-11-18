@@ -22,12 +22,10 @@ st.markdown(
         padding-bottom: 2rem;
     }
 
-    /* Title margin */
     h1 {
         margin-bottom: 0.4rem !important;
     }
 
-    /* Reusable card style */
     .card {
         background-color: rgba(255,255,255,0.03);
         padding: 1.0rem 1.2rem;
@@ -37,33 +35,34 @@ st.markdown(
 
     /* ======== MENU BUTTON (beside title) ======== */
     .menu-toggle .stButton > button {
-        font-size: 1.5rem;
-        padding: 0.35rem 0.7rem;
-        border-radius: 0.6rem;
+        font-size: 1.6rem;
+        padding: 0.35rem 0.75rem;
+        border-radius: 0.7rem;
         border: 1px solid rgba(255,255,255,0.35);
     }
 
-    /* ======== ICON MENU BAR ======== */
-    .menu-container {
-        margin-top: 0.5rem;
-        margin-bottom: 0.6rem;
+    /* ======== VERTICAL ICON MENU (under button) ======== */
+    .menu-container-vertical {
+        margin-top: 0.4rem;
     }
 
-    .menu-container .stButton > button {
-        width: 3rem;
-        height: 3rem;
+    .menu-container-vertical .stButton > button {
+        width: 3.0rem;
+        height: 3.0rem;
+        display: block;
         border-radius: 0.9rem;
         font-size: 1.6rem;
-        position: relative;
         border: 1px solid rgba(255,255,255,0.25);
+        position: relative;
+        margin-bottom: 0.4rem;
     }
 
-    /* Tooltip base style */
-    .menu-container .stButton > button::after {
+    /* Tooltip base */
+    .menu-container-vertical .stButton > button::after {
         position: absolute;
-        top: 115%;
-        left: 50%;
-        transform: translateX(-50%);
+        top: 50%;
+        left: 115%;
+        transform: translateY(-50%);
         background: rgba(15,15,15,0.95);
         color: #fff;
         padding: 0.25rem 0.5rem;
@@ -75,21 +74,21 @@ st.markdown(
         transition: opacity 0.15s ease-in-out;
         z-index: 9999;
     }
-    .menu-container .stButton > button:hover::after {
+    .menu-container-vertical .stButton > button:hover::after {
         opacity: 1;
     }
 
-    /* Tooltip text for each icon, using order (1–4) */
-    .menu-container .stButton:nth-of-type(1) > button::after {
+    /* Tooltip labels per icon (top to bottom) */
+    .menu-container-vertical .stButton:nth-of-type(1) > button::after {
         content: "Global Map";
     }
-    .menu-container .stButton:nth-of-type(2) > button::after {
+    .menu-container-vertical .stButton:nth-of-type(2) > button::after {
         content: "AQI Summary";
     }
-    .menu-container .stButton:nth-of-type(3) > button::after {
+    .menu-container-vertical .stButton:nth-of-type(3) > button::after {
         content: "Country Pollutants";
     }
-    .menu-container .stButton:nth-of-type(4) > button::after {
+    .menu-container-vertical .stButton:nth-of-type(4) > button::after {
         content: "PM2.5 Trends";
     }
 
@@ -184,7 +183,6 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.warning("No 'country' column found in AQI dataset.")
         return
 
-    # Metrics that can be mapped
     metric_options = {}
     if "aqi_value" in aqi_df.columns:
         metric_options["Overall AQI Value"] = "aqi_value"
@@ -198,10 +196,9 @@ def show_global_map(aqi_df: pd.DataFrame):
         st.warning("No AQI metric columns found for mapping.")
         return
 
-    # Main split: left = controls, right = map
     left_col, right_col = st.columns([1.2, 3.8])
 
-    # ---------- LEFT: SETTINGS PANEL ----------
+    # LEFT CONTROLS
     with left_col:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.markdown("#### Settings")
@@ -234,7 +231,7 @@ def show_global_map(aqi_df: pd.DataFrame):
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---------- FILTER DATA ----------
+    # FILTERED DATA
     filtered = aqi_df.copy()
     filtered[metric_col] = pd.to_numeric(filtered[metric_col], errors="coerce")
     filtered = filtered.dropna(subset=[metric_col])
@@ -251,9 +248,8 @@ def show_global_map(aqi_df: pd.DataFrame):
         .rename(columns={metric_col: "metric_value"})
     )
 
-    # ---------- RIGHT: BIG MAP ----------
+    # RIGHT MAP
     with right_col:
-        # centered status line right above map
         st.markdown(
             f"""
             <p style="text-align:center; font-weight:600; margin-bottom:0.4rem;">
@@ -269,7 +265,7 @@ def show_global_map(aqi_df: pd.DataFrame):
             locationmode="country names",
             color="metric_value",
             labels={"metric_value": metric_label, "country": "Country"},
-            height=900,  # big, tall map
+            height=900,
             color_continuous_scale="Blues",
         )
 
@@ -292,7 +288,6 @@ def show_global_map(aqi_df: pd.DataFrame):
 
         st.plotly_chart(fig, width="stretch")
 
-    # ---------- TABLE ----------
     with st.expander("Show aggregated data table"):
         st.dataframe(
             country_metric.sort_values("metric_value", ascending=False),
@@ -383,7 +378,11 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
     st.subheader("📈 PM2.5 Exposure Trend (2010–2019)")
 
     countries = sorted(pm_df["country"].unique())
-    default_selection = ["India", "China"] if "India" in countries and "China" in countries else countries[:2]
+    default_selection = (
+        ["India", "China"]
+        if "India" in countries and "China" in countries
+        else countries[:2]
+    )
 
     selected = st.multiselect(
         "Select countries to compare",
@@ -432,54 +431,48 @@ def show_pm25_trends(pm_df: pd.DataFrame, merged_df: Optional[pd.DataFrame]):
 
 
 # ==============================
-# MAIN APP WITH ICON NAV
+# MAIN APP WITH VERTICAL ICON NAV
 # ==============================
 
 def main():
-    # ---- state for nav ----
     if "active_view" not in st.session_state:
         st.session_state["active_view"] = "map"
     if "menu_open" not in st.session_state:
         st.session_state["menu_open"] = True
 
-    # ---- TITLE + BIG MENU BUTTON ROW ----
-    title_col_btn, title_col_text = st.columns([0.06, 0.94])
+    # TITLE + HAMBURGER
+    btn_col, title_col = st.columns([0.06, 0.94])
 
-    with title_col_btn:
+    with btn_col:
         st.markdown("<div class='menu-toggle'>", unsafe_allow_html=True)
         if st.button("☰", key="menu_toggle_title"):
             st.session_state["menu_open"] = not st.session_state["menu_open"]
         st.markdown("</div>", unsafe_allow_html=True)
 
-    with title_col_text:
-        st.markdown("<h1>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
-
-    # ---- ICON MENU BAR (only icons, hover tooltip) ----
-    if st.session_state["menu_open"]:
-        st.markdown("<div class='menu-container'>", unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
+        # VERTICAL ICON MENU UNDER BUTTON
+        if st.session_state["menu_open"]:
+            st.markdown("<div class='menu-container-vertical'>", unsafe_allow_html=True)
             if st.button("🗺", key="nav_map"):
                 st.session_state["active_view"] = "map"
-        with c2:
             if st.button("📊", key="nav_summary"):
                 st.session_state["active_view"] = "summary"
-        with c3:
             if st.button("🏙", key="nav_country"):
                 st.session_state["active_view"] = "country"
-        with c4:
             if st.button("📈", key="nav_pm25"):
                 st.session_state["active_view"] = "pm25"
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    # ---- LOAD DATA ONCE ----
+    with title_col:
+        st.markdown("<h1>🌍 Global Air Pollution Dashboard</h1>", unsafe_allow_html=True)
+
+    # LOAD DATA
     aqi_df = load_aqi_data()
     pm_df = load_pm25_data()
     merged_df = get_merged_pm25_aqi(aqi_df, pm_df)
 
     view = st.session_state["active_view"]
 
-    # ---- ROUTE TO ACTIVE VIEW ----
+    # ROUTING
     if view == "map":
         show_global_map(aqi_df)
     elif view == "summary":
