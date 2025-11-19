@@ -16,15 +16,6 @@ st.set_page_config(
 # ------------------------------------------------------------------
 st.markdown(
     """
-    <style>
-    /* Tighten padding so visuals are higher and wider */
-    .block-container {
-        padding-top: 2.0rem;
-        padding-bottom: 1.2rem;
-        padding-left: 1.2rem;
-        padding-right: 1.2rem;
-    }
-
     /* Top header band */
     .top-header {
         background: linear-gradient(90deg, #020617, #020617);
