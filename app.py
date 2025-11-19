@@ -19,7 +19,7 @@ st.markdown(
     <style>
     /* Tighten padding so visuals are higher and wider */
     .block-container {
-        padding-top: 0.8rem;
+        padding-top: 2.0rem;
         padding-bottom: 1.2rem;
         padding-left: 1.2rem;
         padding-right: 1.2rem;
