@@ -12,46 +12,80 @@ st.set_page_config(
 )
 
 # ------------------------------------------------------------------
-# Minimal styling (cards, spacing, dark theme polish)
+# Global CSS for layout / look
 # ------------------------------------------------------------------
 st.markdown(
     """
     <style>
-    /* Tighten padding so visuals are higher and wider */
+    /* Reduce default page padding so we can use space better */
     .block-container {
-        padding-top: 2.0rem;
-        padding-bottom: 1.2rem;
-        padding-left: 1.2rem;
-        padding-right: 1.2rem;
+        padding-top: 0rem;
+        padding-bottom: 1.5rem;
+        padding-left: 0rem;
+        padding-right: 0rem;
     }
-    /* Top header band */
-    .top-header {
-        background: linear-gradient(90deg, #020617, #020617);
-        border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-        padding: 0.75rem 0.9rem 0.7rem 0.9rem;
-        margin-bottom: 0.8rem;
-    }
-    .top-title {
-        font-size: 1.6rem;
-        font-weight: 700;
+
+    /* Top bar (like VizHub title strip) */
+    .top-bar {
+        width: 100%;
+        background-color: #020617; /* very dark */
+        border-bottom: 1px solid #1f2937;
+        padding: 0.45rem 1.75rem;
         display: flex;
         align-items: center;
-        gap: 0.45rem;
+        justify-content: space-between;
+        box-sizing: border-box;
     }
-    .top-subtitle {
-        font-size: 0.82rem;
+    .top-bar-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #F9FAFB;
+        letter-spacing: 0.03em;
+    }
+    .top-bar-subtitle {
+        font-size: 0.75rem;
         color: #9CA3AF;
-        margin-top: 0.15rem;
     }
 
-    /* Left filter panel look */
+    /* Left vertical nav column – make it tight */
+    .nav-sidebar {
+        padding-top: 0.6rem;
+        padding-left: 0.75rem;
+        padding-right: 0.25rem;
+    }
+
+    /* Make radio options look like small stacked pills, no bullets */
+    .nav-sidebar div[role="radiogroup"] > label {
+        display: block;
+        padding: 0.35rem 0.55rem;
+        margin-bottom: 0.45rem;
+        border-radius: 0.6rem;
+        background-color: #020617;
+        border: 1px solid #111827;
+        cursor: pointer;
+        font-size: 0.78rem;
+    }
+    .nav-sidebar div[role="radiogroup"] > label:hover {
+        background-color: #111827;
+        border-color: #1f2937;
+    }
+    /* Selected state: slightly brighter border / bg */
+    .nav-sidebar div[role="radiogroup"] > label[data-baseweb="radio"] > div:first-child {
+        display: none;  /* hide the round bullet */
+    }
+    .nav-sidebar div[role="radiogroup"] > label[data-baseweb="radio"][aria-checked="true"] {
+        background-color: #111827;
+        border-color: #3B82F6;
+    }
+
+    /* Filter panel card */
     .filter-card {
         background-color: #020617;
-        padding: 1.05rem 1.15rem;
+        padding: 1.1rem 1.2rem 1.0rem 1.2rem;
         border-radius: 0.75rem;
         box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.25);
+        margin-top: 0.75rem;
     }
-
     .filter-title {
         font-weight: 600;
         font-size: 1.0rem;
@@ -60,13 +94,16 @@ st.markdown(
         align-items: center;
         gap: 0.35rem;
     }
-
+    .filter-title span.icon {
+        font-size: 1.0rem;
+    }
     .filter-label {
         font-size: 0.78rem;
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: #9CA3AF;
-        margin-bottom: 0.15rem;
+        margin-bottom: 0.2rem;
+        margin-top: 0.55rem;
     }
 
     /* Small label above map */
@@ -74,45 +111,14 @@ st.markdown(
         text-align: center;
         font-size: 0.8rem;
         color: #D1D5DB;
-        margin-bottom: 0.5rem;
-        margin-top: 0.1rem;
+        margin-bottom: 0.6rem;
+        margin-top: 0.3rem;
     }
 
-    /* --- ICON RAIL --- */
-    /* Make the left column visually a rail */
-    .icon-rail .stRadio > div {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
+    /* Make expander match the dark theme a bit better */
+    .streamlit-expanderHeader {
+        font-size: 0.82rem;
     }
-    .icon-rail label {
-        width: 44px;
-        height: 44px;
-        border-radius: 0.9rem;
-        border: 1px solid rgba(148, 163, 184, 0.40);
-        background: #020617;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.15s ease-out;
-        padding: 0;
-    }
-    .icon-rail label:hover {
-        border-color: #38bdf8;
-        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5);
-    }
-    .icon-rail input {
-        display: none;
-    }
-    .icon-rail .stRadio [aria-checked="true"] + div label {
-        background: #0f172a;
-        border-color: #38bdf8;
-        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.7);
-    }
-
-    /* Shrink nav column so it acts like the IHME left strip */
-    /* (Streamlit uses dynamic classes, so we only rely on ratios in st.columns) */
     </style>
     """,
     unsafe_allow_html=True,
@@ -155,13 +161,9 @@ base_df = load_base_data()
 pm25_df = load_pm25_data()
 
 # ------------------------------------------------------------------
-# Helpers
+# Helper: build metric options safely from whatever columns exist
 # ------------------------------------------------------------------
 def get_metric_options(df: pd.DataFrame):
-    """
-    Build a dict of friendly label -> column name
-    based on what actually exists in the dataset.
-    """
     col_map = {}
 
     if "aqi_value" in df.columns:
@@ -177,7 +179,7 @@ def get_metric_options(df: pd.DataFrame):
     if "o3_aqi_value" in df.columns:
         col_map["O₃ AQI Value"] = "o3_aqi_value"
 
-    # Fallback: if nothing above exists, just pick any numeric column
+    # Fallback: any numeric column
     if not col_map:
         numeric_cols = df.select_dtypes(include="number").columns.tolist()
         for c in numeric_cols:
@@ -188,103 +190,100 @@ def get_metric_options(df: pd.DataFrame):
 
 
 # ------------------------------------------------------------------
-# Navigation – vertical icon menu on the far left
+# Session state for navigation
 # ------------------------------------------------------------------
 if "active_page" not in st.session_state:
     st.session_state.active_page = "map"
 
-# Icon mapping (icons only; labels used for tooltips + logic)
-ICON_MAP = {
-    "map": "🗺",
-    "summary": "📊",
-    "country": "🏙",
-    "pm25": "📈",
-}
-ICON_HELP = {
-    "map": "Global Map",
-    "summary": "AQI Summary",
-    "country": "Country Pollutants",
-    "pm25": "PM2.5 Trends (2010–2019)",
-}
+# ------------------------------------------------------------------
+# TOP BAR (always visible, full width)
+# ------------------------------------------------------------------
+st.markdown(
+    """
+    <div class="top-bar">
+        <div class="top-bar-title">🌍 Global Air Pollution Dashboard</div>
+        <div class="top-bar-subtitle">
+            Interactive exploration of global air quality, pollutants and PM2.5 trends
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-rail_col, content_col = st.columns([0.06, 0.94])
+# ------------------------------------------------------------------
+# MAIN LAYOUT: [left icon nav] | [page content]
+# ------------------------------------------------------------------
+nav_col, content_col = st.columns([0.07, 0.93])
 
-with rail_col:
-    st.markdown("<div class='icon-rail'>", unsafe_allow_html=True)
+# ----------------- LEFT NAV -----------------
+with nav_col:
+    st.markdown("<div class='nav-sidebar'>", unsafe_allow_html=True)
 
-    icons = list(ICON_MAP.values())
-    # Figure out default index from current active_page
-    current_icon = ICON_MAP.get(st.session_state.active_page, "🗺")
-    default_index = icons.index(current_icon)
-
-    # Radio with icons only; show a generic label but hide in CSS style
-    selected_icon = st.radio(
+    # Use radio so you can see which view is active
+    choice = st.radio(
         "Navigation",
-        icons,
-        index=default_index,
+        [
+            "🗺 Global Map",
+            "📊 AQI Summary",
+            "🏙 Country Pollutants",
+            "📈 PM2.5 Trends",
+        ],
+        index=[
+            "map",
+            "summary",
+            "country",
+            "pm25",
+        ].index(st.session_state.active_page),
         label_visibility="collapsed",
-        help="🗺 Global Map · 📊 AQI Summary · 🏙 Country Pollutants · 📈 PM2.5 Trends",
-        key="icon_nav",
     )
+
+    if "Global Map" in choice:
+        st.session_state.active_page = "map"
+    elif "AQI Summary" in choice:
+        st.session_state.active_page = "summary"
+    elif "Country Pollutants" in choice:
+        st.session_state.active_page = "country"
+    elif "PM2.5 Trends" in choice:
+        st.session_state.active_page = "pm25"
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-    # Map icon back to page key
-    for key, icon in ICON_MAP.items():
-        if icon == selected_icon:
-            st.session_state.active_page = key
-            break
-
+# ----------------- RIGHT CONTENT -----------------
 with content_col:
     page = st.session_state.active_page
-
-    # ------------------------------------------------------------------
-    # Top header band
-    # ------------------------------------------------------------------
-    if page == "map":
-        subtitle = "Global Air Pollution Map (Interactive)"
-    elif page == "summary":
-        subtitle = "Distribution and basic statistics of selected AQI metric"
-    elif page == "country":
-        subtitle = "Average pollutant AQI levels by country"
-    else:
-        subtitle = "Long-term PM2.5 trends from the secondary dataset"
-
-    st.markdown(
-        f"""
-        <div class="top-header">
-            <div class="top-title">
-                🌍 <span>Global Air Pollution Dashboard</span>
-            </div>
-            <div class="top-subtitle">{subtitle}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 
     # ==============================================================
     # PAGE 1 – GLOBAL MAP (INTERACTIVE)
     # ==============================================================
     if page == "map":
+        # Page subtitle (just text, top-left)
+        st.markdown(
+            "#### 🗺 Global Air Pollution Map (Interactive)",
+        )
+
         metric_options = get_metric_options(base_df)
+        default_metric_label = (
+            "Overall AQI Value"
+            if "Overall AQI Value" in metric_options
+            else list(metric_options.keys())[0]
+        )
 
-        # Safe default metric label
-        if "Overall AQI Value" in metric_options:
-            default_metric_label = "Overall AQI Value"
-        else:
-            default_metric_label = list(metric_options.keys())[0]
+        # Layout for this page: [filters | map], both inside the right content column
+        filters_col, map_col = st.columns([0.30, 0.70])
 
-        # --------- Layout: Filters (left) | Map (right)
-        filters_col, map_col = st.columns([0.32, 0.68])
-
+        # ---------- FILTER PANEL ----------
         with filters_col:
             st.markdown(
-                "<div class='filter-card'>"
-                "<div class='filter-title'>⚙️ Settings</div>",
+                """
+                <div class='filter-card'>
+                    <div class='filter-title'>
+                        <span class='icon'>⚙️</span><span>Settings</span>
+                    </div>
+                """,
                 unsafe_allow_html=True,
             )
 
-            # 1. Metric
+            # Metric selector
             st.markdown(
                 "<div class='filter-label'>Pollution metric</div>",
                 unsafe_allow_html=True,
@@ -295,16 +294,18 @@ with content_col:
                 index=list(metric_options.keys()).index(default_metric_label),
                 key="map_metric",
             )
-            # Safety: if something weird happens, fall back to first column
-            metric_col = metric_options.get(metric_label, list(metric_options.values())[0])
+            metric_col = metric_options[metric_label]
 
-            # 2. AQI categories
+            # AQI categories
             if "aqi_category" in base_df.columns:
                 st.markdown(
-                    "<div class='filter-label' style='margin-top:0.6rem;'>AQI category</div>",
+                    "<div class='filter-label'>AQI category</div>",
                     unsafe_allow_html=True,
                 )
-                categories = sorted(base_df["aqi_category"].dropna().unique().tolist())
+                categories = (
+                    base_df["aqi_category"].dropna().unique().tolist()
+                )
+                categories = sorted(categories)
                 selected_cats = st.multiselect(
                     "",
                     categories,
@@ -314,10 +315,10 @@ with content_col:
             else:
                 selected_cats = None
 
-            # 3. Min overall AQI threshold (if we have aqi_value at all)
+            # Min overall AQI slider
             if "aqi_value" in base_df.columns:
                 st.markdown(
-                    "<div class='filter-label' style='margin-top:0.6rem;'>Minimum overall AQI value</div>",
+                    "<div class='filter-label'>Minimum overall AQI value</div>",
                     unsafe_allow_html=True,
                 )
                 min_val = float(base_df["aqi_value"].min())
@@ -335,12 +336,12 @@ with content_col:
 
             st.markdown("</div>", unsafe_allow_html=True)  # close filter-card
 
-        # --------------------- MAP COLUMN -------------------------
+        # ---------- MAP ----------
         with map_col:
             df_map = base_df.copy()
 
             # Apply filters
-            if selected_cats is not None and selected_cats:
+            if selected_cats:
                 df_map = df_map[df_map["aqi_category"].isin(selected_cats)]
 
             if min_threshold is not None and "aqi_value" in df_map.columns:
@@ -358,7 +359,6 @@ with content_col:
 
                 n_countries = agg["country"].nunique()
 
-                # Summary text above the map
                 summary_text = f"Showing {n_countries} countries · Metric: {metric_label}"
                 if min_threshold is not None:
                     summary_text += f" · Min overall AQI: {min_threshold:.0f}"
@@ -368,7 +368,6 @@ with content_col:
                     unsafe_allow_html=True,
                 )
 
-                # Build choropleth
                 vmin = float(agg[metric_col].min())
                 vmax = float(agg[metric_col].max())
 
@@ -380,14 +379,13 @@ with content_col:
                     color_continuous_scale="Blues",
                     range_color=(vmin, vmax),
                 )
-
                 fig.update_layout(
-                    height=580,
-                    margin=dict(l=0, r=0, t=8, b=0),
+                    height=560,
+                    margin=dict(l=0, r=0, t=10, b=0),
                     coloraxis_colorbar=dict(
                         title=metric_label,
                         orientation="h",
-                        y=-0.19,
+                        y=-0.18,
                         x=0.5,
                         thickness=10,
                         len=0.7,
@@ -397,29 +395,29 @@ with content_col:
                 st.plotly_chart(fig, use_container_width=True)
 
                 with st.expander("Show aggregated data table"):
-                    st.dataframe(
-                        agg.rename(columns={metric_col: metric_label}),
-                    )
+                    st.dataframe(agg.rename(columns={metric_col: metric_label}))
 
     # ==============================================================
     # PAGE 2 – AQI SUMMARY
     # ==============================================================
     elif page == "summary":
-        st.subheader("📊 AQI Summary (Method 1)")
+        st.markdown("#### 📊 AQI Summary (Method 1)")
 
         metric_options = get_metric_options(base_df)
         metric_label = st.selectbox(
-            "Metric to summarise", list(metric_options.keys()), key="summary_metric"
+            "Metric to summarise",
+            list(metric_options.keys()),
+            key="summary_metric",
         )
-        metric_col = metric_options.get(metric_label, list(metric_options.values())[0])
+        metric_col = metric_options[metric_label]
 
         left, right = st.columns([0.5, 0.5])
 
         with left:
-            st.markdown("#### Distribution")
+            st.markdown("##### Distribution")
             st.write(
                 "Histogram of the selected metric across all cities/countries "
-                "(helps see typical air quality levels and outliers)."
+                "to see typical air quality levels and outliers."
             )
             fig_hist = px.histogram(
                 base_df,
@@ -428,13 +426,13 @@ with content_col:
                 title=None,
             )
             fig_hist.update_layout(
-                height=420,
+                height=400,
                 margin=dict(l=0, r=0, t=10, b=0),
             )
             st.plotly_chart(fig_hist, use_container_width=True)
 
         with right:
-            st.markdown("#### Basic statistics")
+            st.markdown("##### Basic statistics")
             desc = base_df[metric_col].describe()[
                 ["mean", "std", "min", "25%", "50%", "75%", "max"]
             ]
@@ -444,7 +442,7 @@ with content_col:
     # PAGE 3 – COUNTRY POLLUTANTS
     # ==============================================================
     elif page == "country":
-        st.subheader("🏙 Country Pollutant Breakdown")
+        st.markdown("#### 🏙 Country Pollutant Breakdown")
 
         if "country" not in base_df.columns:
             st.error("Column 'country' is missing in the dataset.")
@@ -467,10 +465,11 @@ with content_col:
             else:
                 avg_pollutants = df_c[pollutant_cols].mean().reset_index()
                 avg_pollutants.columns = ["pollutant", "aqi_value"]
-
-                avg_pollutants["pollutant"] = avg_pollutants[
-                    "pollutant"
-                ].str.replace("_aqi_value", "", regex=False).str.upper()
+                avg_pollutants["pollutant"] = (
+                    avg_pollutants["pollutant"]
+                    .str.replace("_aqi_value", "", regex=False)
+                    .str.upper()
+                )
 
                 fig_bar = px.bar(
                     avg_pollutants,
@@ -480,7 +479,7 @@ with content_col:
                     title=f"Average pollutant AQI levels in {selected_country}",
                 )
                 fig_bar.update_layout(
-                    height=460,
+                    height=440,
                     margin=dict(l=0, r=0, t=40, b=0),
                 )
 
@@ -493,7 +492,7 @@ with content_col:
     # PAGE 4 – PM2.5 TRENDS (2010–2019)
     # ==============================================================
     elif page == "pm25":
-        st.subheader("📈 PM2.5 Trends (2010–2019)")
+        st.markdown("#### 📈 PM2.5 Trends (2010–2019)")
 
         if pm25_df is None:
             st.warning(
@@ -501,12 +500,13 @@ with content_col:
                 "`data/raw/`. Please add it to enable this tab."
             )
         else:
-            # Expecting columns like: country, year, pm25 or similar
-            candidate_country = "country" if "country" in pm25_df.columns else pm25_df.columns[0]
+            # Try to infer generic columns
+            candidate_country = (
+                "country" if "country" in pm25_df.columns else pm25_df.columns[0]
+            )
             candidate_year = "year" if "year" in pm25_df.columns else pm25_df.columns[1]
 
             numeric_cols = pm25_df.select_dtypes(include="number").columns.tolist()
-            # Remove year if numeric
             if candidate_year in numeric_cols:
                 numeric_cols.remove(candidate_year)
             pm_col = numeric_cols[0] if numeric_cols else None
@@ -514,7 +514,9 @@ with content_col:
             if not pm_col:
                 st.error("Could not find a numeric PM2.5 column in the PM dataset.")
             else:
-                countries = sorted(pm25_df[candidate_country].dropna().unique().tolist())
+                countries = sorted(
+                    pm25_df[candidate_country].dropna().unique().tolist()
+                )
                 selected_country = st.selectbox(
                     "Choose a country", countries, key="pm25_country"
                 )
@@ -530,9 +532,8 @@ with content_col:
                     labels={candidate_year: "Year", pm_col: "PM2.5"},
                     title=f"PM2.5 trend over time – {selected_country}",
                 )
-
                 fig_line.update_layout(
-                    height=460,
+                    height=440,
                     margin=dict(l=0, r=0, t=40, b=0),
                 )
 
