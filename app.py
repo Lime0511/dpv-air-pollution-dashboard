@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
 # -----------------------------------------------------------
@@ -10,7 +11,7 @@ def load_base_data() -> pd.DataFrame:
     """Global AQI dataset (Kaggle global air pollution)."""
     df = pd.read_csv("data/raw/global_air_pollution.csv")
 
-    # Normalise column names
+    # Normalise column names (no row dropping here – keep raw data)
     df.columns = (
         df.columns.str.strip()
         .str.lower()
@@ -96,8 +97,10 @@ def get_metric_options(df: pd.DataFrame) -> dict[str, str]:
     return col_map
 
 
+metric_options = get_metric_options(base_df)
+
 # -----------------------------------------------------------
-# Page config + global CSS
+# Page config + global CSS (UI/UX polish)
 # -----------------------------------------------------------
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
@@ -119,9 +122,9 @@ st.markdown(
     }
     .top-bar {
         width: 100%;
-        background-color: #b9f2f0;
+        background: linear-gradient(90deg,#b9f2f0,#dbeafe);
         border-bottom: 1px solid #cbd5e1;
-        padding: 0.5rem 1.75rem;
+        padding: 0.6rem 1.75rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -129,12 +132,12 @@ st.markdown(
     }
     .top-bar-title {
         font-size: 1.1rem;
-        font-weight: 600;
+        font-weight: 650;
         color: #0f172a;
         letter-spacing: 0.03em;
     }
     .top-bar-subtitle {
-        font-size: 0.78rem;
+        font-size: 0.8rem;
         color: #1f2933;
     }
     .nav-sidebar {
@@ -144,9 +147,9 @@ st.markdown(
     }
     .nav-sidebar div[role="radiogroup"] > label {
         display: block;
-        padding: 0.35rem 0.55rem;
+        padding: 0.4rem 0.55rem;
         margin-bottom: 0.45rem;
-        border-radius: 0.35rem;
+        border-radius: 0.4rem;
         background-color: #ffffff;
         border: 1px solid #e5e7eb;
         cursor: pointer;
@@ -162,12 +165,13 @@ st.markdown(
     .nav-sidebar div[role="radiogroup"] > label[data-baseweb="radio"][aria-checked="true"] {
         background-color: #e0f2fe;
         border-color: #3b82f6;
+        box-shadow: 0 0 0 1px rgba(59,130,246,0.4);
     }
     .filter-card {
         background-color: #ffffff;
         padding: 1.0rem 1.0rem 0.9rem 1.0rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        border-radius: 0.75rem;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
         border: 1px solid #e5e7eb;
         margin-top: 0.75rem;
     }
@@ -199,11 +203,11 @@ st.markdown(
         margin-top: 0.2rem;
     }
     .kpi-card {
-        padding: 0.7rem 0.9rem;
+        padding: 0.8rem 1.0rem;
         background-color: #ffffff;
-        border-radius: 0.5rem;
+        border-radius: 0.75rem;
         border: 1px solid #e5e7eb;
-        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
     }
     .kpi-label {
         font-size: 0.75rem;
@@ -213,13 +217,18 @@ st.markdown(
         margin-bottom: 0.15rem;
     }
     .kpi-value {
-        font-size: 1.1rem;
-        font-weight: 600;
+        font-size: 1.15rem;
+        font-weight: 650;
         color: #111827;
     }
     .kpi-sub {
         font-size: 0.75rem;
         color: #6b7280;
+    }
+    .section-caption {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-bottom: 0.4rem;
     }
     .streamlit-expanderHeader {
         font-size: 0.82rem;
@@ -233,9 +242,9 @@ st.markdown(
 st.markdown(
     """
     <div class="top-bar">
-        <div class="top-bar-title">GBD-style Global Air Pollution Dashboard</div>
+        <div class="top-bar-title">Global Air Pollution Analytics &amp; Visualisation Suite</div>
         <div class="top-bar-subtitle">
-            Visualising worldwide air quality (AQI) and PM2.5 exposure with interactive maps and charts
+            Explore AQI, compare countries, and run your own custom analyses with interactive cleaning and filters.
         </div>
     </div>
     """,
@@ -256,6 +265,7 @@ with nav_col:
             "📊 AQI Summary",
             "🏙 Country Pollutants",
             "🔍 Country Deep Dive",
+            "🧪 Data Lab (Dynamic Analysis)",
             "📈 PM2.5 Trends",
         ],
         label_visibility="collapsed",
@@ -270,10 +280,10 @@ elif "Country Pollutants" in choice:
     page = "country"
 elif "Country Deep Dive" in choice:
     page = "deep_dive"
+elif "Data Lab" in choice:
+    page = "data_lab"
 else:
     page = "pm25"
-
-metric_options = get_metric_options(base_df)
 
 # -----------------------------------------------------------
 # Content
@@ -285,6 +295,7 @@ with content_col:
     # =======================================================
     if page == "map":
         st.markdown("### 🗺 Global Air Pollution Map (Interactive)")
+        st.caption("Use the controls on the left to adjust the metric, AQI categories, and minimum AQI threshold.")
 
         default_metric_label = (
             "Overall AQI Value"
@@ -452,6 +463,7 @@ with content_col:
     # =======================================================
     elif page == "summary":
         st.markdown("### 📊 AQI Summary")
+        st.caption("Explore the distribution of any AQI metric and inspect basic statistics and correlations.")
 
         metric_label = st.selectbox(
             "Metric to summarise",
@@ -460,7 +472,7 @@ with content_col:
         )
         metric_col = metric_options[metric_label]
 
-        left, right = st.columns([0.5, 0.5])
+        left, right = st.columns([0.52, 0.48])
 
         with left:
             st.markdown("#### Distribution")
@@ -498,51 +510,68 @@ with content_col:
             st.plotly_chart(fig_corr, use_container_width=True)
 
     # =======================================================
-    # PAGE 3 – Country pollutants (bar chart)
+    # PAGE 3 – Country pollutants (multi-country comparison)
     # =======================================================
     elif page == "country":
         st.markdown("### 🏙 Country Pollutant Breakdown")
+        st.caption("Compare pollutant-specific AQI levels across multiple countries.")
 
         if "country" not in base_df.columns:
             st.error("Column 'country' is missing in the dataset.")
         else:
             countries = sorted(base_df["country"].dropna().unique().tolist())
-            selected_country = st.selectbox("Choose a country", countries, key="country_select")
+            default_countries = countries[:3] if len(countries) >= 3 else countries
+            selected_countries = st.multiselect(
+                "Choose countries to compare",
+                countries,
+                default=default_countries,
+                key="country_multi",
+            )
 
-            df_c = base_df[base_df["country"] == selected_country]
-
-            pollutant_cols = [
-                c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
-            ]
-            if not pollutant_cols:
-                st.warning("No pollutant-specific AQI columns found in the dataset.")
+            if not selected_countries:
+                st.info("Select at least one country to view the comparison.")
             else:
-                avg_pollutants = df_c[pollutant_cols].mean().reset_index()
-                avg_pollutants.columns = ["pollutant", "aqi_value"]
-                avg_pollutants["pollutant"] = (
-                    avg_pollutants["pollutant"]
-                    .str.replace("_aqi_value", "", regex=False)
-                    .str.upper()
-                )
+                df_c = base_df[base_df["country"].isin(selected_countries)]
 
-                fig_bar = px.bar(
-                    avg_pollutants,
-                    x="pollutant",
-                    y="aqi_value",
-                    labels={"aqi_value": "Average AQI"},
-                    title=f"Average pollutant AQI levels in {selected_country}",
-                )
-                fig_bar.update_layout(height=440, margin=dict(l=0, r=0, t=40, b=0))
-                st.plotly_chart(fig_bar, use_container_width=True)
+                pollutant_cols = [
+                    c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
+                ]
+                if not pollutant_cols:
+                    st.warning("No pollutant-specific AQI columns found in the dataset.")
+                else:
+                    avg_pollutants = df_c.groupby("country")[pollutant_cols].mean().reset_index()
 
-                with st.expander("Show underlying values"):
-                    st.dataframe(avg_pollutants)
+                    long_df = avg_pollutants.melt(
+                        id_vars="country",
+                        value_vars=pollutant_cols,
+                        var_name="pollutant",
+                        value_name="aqi_value",
+                    )
+                    long_df["pollutant"] = (
+                        long_df["pollutant"].str.replace("_aqi_value", "", regex=False).str.upper()
+                    )
+
+                    fig_bar = px.bar(
+                        long_df,
+                        x="country",
+                        y="aqi_value",
+                        color="pollutant",
+                        barmode="group",
+                        labels={"aqi_value": "Average AQI"},
+                        title="Average pollutant AQI levels by country",
+                    )
+                    fig_bar.update_layout(height=460, margin=dict(l=0, r=0, t=40, b=0))
+                    st.plotly_chart(fig_bar, use_container_width=True)
+
+                    with st.expander("Show underlying values"):
+                        st.dataframe(long_df)
 
     # =======================================================
     # PAGE 4 – Country Deep Dive (uses both datasets)
     # =======================================================
     elif page == "deep_dive":
         st.markdown("### 🔍 Country Deep Dive")
+        st.caption("Single-country dashboard with current AQI profile and historical PM2.5 exposure.")
 
         if pm25_df is None:
             st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
@@ -631,10 +660,218 @@ with content_col:
                             st.dataframe(df_pm[[pm_country_col, pm_year_col, pm_value_col]])
 
     # =======================================================
-    # PAGE 5 – PM2.5 Trends (simple)
+    # PAGE 5 – DATA LAB (Dynamic Problem + Cleaning)
+    # =======================================================
+    elif page == "data_lab":
+        st.markdown("### 🧪 Data Lab – Dynamic Problem & Preprocessing")
+        st.caption(
+            "This page demonstrates Method 2 (user-defined analysis): "
+            "you choose how to clean the data, then ask your own questions."
+        )
+
+        st.markdown("#### 1. Data cleaning & transformation settings")
+        clean_col, info_col = st.columns([0.7, 0.3])
+
+        with clean_col:
+            # Missing data strategy
+            missing_strategy = st.radio(
+                "Missing values handling",
+                [
+                    "Leave as is (raw data)",
+                    "Drop rows with any missing value",
+                    "Fill numeric columns with column mean",
+                    "Fill numeric columns with column median",
+                ],
+                index=0,
+            )
+
+            # Choose base metric for transformations / filters
+            numeric_cols = base_df.select_dtypes(include="number").columns.tolist()
+            if not numeric_cols:
+                st.error("No numeric columns detected in the dataset.")
+                st.stop()
+
+            default_metric = "aqi_value" if "aqi_value" in numeric_cols else numeric_cols[0]
+            base_metric = st.selectbox(
+                "Metric to focus on (for scaling & filters)",
+                numeric_cols,
+                index=numeric_cols.index(default_metric),
+            )
+
+            norm_choice = st.selectbox(
+                "Normalisation / scaling (optional)",
+                ["None", "Min–max (0–1)", "Z-score (mean 0, std 1)"],
+            )
+
+            # Outlier filter by percentile
+            st.markdown(
+                "<div class='section-caption'>Optional noise filtering: keep only values within a percentile range.</div>",
+                unsafe_allow_html=True,
+            )
+            p_low, p_high = st.slider(
+                "Percentile range for the chosen metric",
+                min_value=0,
+                max_value=100,
+                value=(0, 100),
+                step=1,
+            )
+
+        with info_col:
+            st.markdown("##### Why this matters?")
+            st.markdown(
+                "- **Missing values** can bias averages if ignored.\n"
+                "- **Normalisation** puts metrics on comparable scales.\n"
+                "- **Percentile filters** remove extreme outliers (noise)."
+            )
+
+        # ---- Apply cleaning & transformations
+        df_clean = base_df.copy()
+
+        # Missing values
+        if missing_strategy == "Drop rows with any missing value":
+            df_clean = df_clean.dropna()
+        elif missing_strategy == "Fill numeric columns with column mean":
+            num_cols = df_clean.select_dtypes(include="number").columns
+            df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.mean()))
+        elif missing_strategy == "Fill numeric columns with column median":
+            num_cols = df_clean.select_dtypes(include="number").columns
+            df_clean[num_cols] = df_clean[num_cols].apply(lambda col: col.fillna(col.median()))
+        # else: leave as is
+
+        # Normalisation
+        active_metric_col = base_metric
+        if norm_choice != "None":
+            col = df_clean[base_metric].astype(float)
+            if norm_choice == "Min–max (0–1)":
+                min_v, max_v = col.min(), col.max()
+                if max_v > min_v:
+                    df_clean[f"{base_metric}_scaled"] = (col - min_v) / (max_v - min_v)
+                    active_metric_col = f"{base_metric}_scaled"
+            elif norm_choice == "Z-score (mean 0, std 1)":
+                mean_v, std_v = col.mean(), col.std()
+                if std_v > 0:
+                    df_clean[f"{base_metric}_z"] = (col - mean_v) / std_v
+                    active_metric_col = f"{base_metric}_z"
+
+        # Outlier filter by percentile
+        if p_low > 0 or p_high < 100:
+            q_low = np.percentile(df_clean[base_metric].dropna(), p_low)
+            q_high = np.percentile(df_clean[base_metric].dropna(), p_high)
+            df_clean = df_clean[(df_clean[base_metric] >= q_low) & (df_clean[base_metric] <= q_high)]
+
+        st.markdown("#### 2. Ask your own question (dynamic analysis)")
+
+        # Filters the user can choose for the question
+        q_col1, q_col2, q_col3 = st.columns(3)
+
+        with q_col1:
+            if "country" in df_clean.columns:
+                countries = sorted(df_clean["country"].dropna().unique().tolist())
+                default_countries = countries[:5] if len(countries) >= 5 else countries
+                selected_countries = st.multiselect(
+                    "Filter by country (optional)",
+                    countries,
+                    default=default_countries,
+                )
+            else:
+                selected_countries = None
+
+        with q_col2:
+            if "aqi_category" in df_clean.columns:
+                categories = sorted(df_clean["aqi_category"].dropna().unique().tolist())
+                selected_q_cats = st.multiselect(
+                    "Filter by AQI category (optional)",
+                    categories,
+                    default=categories,
+                )
+            else:
+                selected_q_cats = None
+
+        with q_col3:
+            # Value range filter for the active metric
+            v_min = float(df_clean[base_metric].min())
+            v_max = float(df_clean[base_metric].max())
+            val_low, val_high = st.slider(
+                f"Filter {base_metric} range",
+                min_value=float(round(v_min, 1)),
+                max_value=float(round(v_max, 1)),
+                value=(float(round(v_min, 1)), float(round(v_max, 1))),
+                step=1.0,
+            )
+
+        # Apply question filters
+        df_q = df_clean.copy()
+        if selected_countries:
+            df_q = df_q[df_q["country"].isin(selected_countries)]
+        if selected_q_cats:
+            df_q = df_q[df_q["aqi_category"].isin(selected_q_cats)]
+        df_q = df_q[(df_q[base_metric] >= val_low) & (df_q[base_metric] <= val_high)]
+
+        st.markdown("##### What do you want to know?")
+        q_type = st.radio(
+            "Choose an analysis type",
+            [
+                "How many records match my filters?",
+                "What is the average of the chosen metric?",
+                "Who are the top N countries by the chosen metric?",
+                "Compare mean metric across selected countries (bar chart).",
+            ],
+            label_visibility="collapsed",
+        )
+
+        if df_q.empty:
+            st.warning("No rows match your current filters. Try relaxing them.")
+        else:
+            if q_type == "How many records match my filters?":
+                count = len(df_q)
+                st.metric("Number of rows that match your filters", count)
+                st.caption("Each row typically represents a city-level observation.")
+            elif q_type == "What is the average of the chosen metric?":
+                avg_val = df_q[base_metric].mean()
+                st.metric(f"Average {base_metric} for your filtered subset", f"{avg_val:.2f}")
+            elif q_type == "Who are the top N countries by the chosen metric?":
+                if "country" not in df_q.columns:
+                    st.error("Country column is missing – cannot aggregate.")
+                else:
+                    n = st.slider("Top N countries", min_value=3, max_value=20, value=10)
+                    agg = df_q.groupby("country", as_index=False)[base_metric].mean()
+                    top_n = agg.nlargest(n, base_metric)
+
+                    st.markdown("###### Result")
+                    st.dataframe(top_n)
+
+                    fig_top = px.bar(
+                        top_n,
+                        x="country",
+                        y=base_metric,
+                        title=f"Top {n} countries by {base_metric}",
+                    )
+                    fig_top.update_layout(height=420, margin=dict(l=0, r=0, t=40, b=0))
+                    st.plotly_chart(fig_top, use_container_width=True)
+            else:
+                # Compare mean metric across selected countries
+                if "country" not in df_q.columns:
+                    st.error("Country column is missing – cannot aggregate.")
+                else:
+                    agg = df_q.groupby("country", as_index=False)[base_metric].mean()
+                    fig_cmp = px.bar(
+                        agg,
+                        x="country",
+                        y=base_metric,
+                        title=f"Mean {base_metric} for countries in your filtered subset",
+                    )
+                    fig_cmp.update_layout(height=420, margin=dict(l=0, r=0, t=40, b=0))
+                    st.plotly_chart(fig_cmp, use_container_width=True)
+
+            with st.expander("Show cleaned & filtered data table"):
+                st.dataframe(df_q)
+
+    # =======================================================
+    # PAGE 6 – PM2.5 Trends (simple)
     # =======================================================
     else:  # page == "pm25"
         st.markdown("### 📈 PM2.5 Trends (2010–2019)")
+        st.caption("Inspect long-term PM2.5 exposure trends for any country in the PM2.5 dataset.")
 
         if pm25_df is None:
             st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
