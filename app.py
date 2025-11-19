@@ -11,7 +11,7 @@ def load_base_data() -> pd.DataFrame:
     """Global AQI dataset (Kaggle global air pollution)."""
     df = pd.read_csv("data/raw/global_air_pollution.csv")
 
-    # Normalise column names (no row dropping here – keep raw data)
+    # Normalise column names (keep all rows; no cleaning here)
     df.columns = (
         df.columns.str.strip()
         .str.lower()
@@ -111,20 +111,33 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    :root {
+        --accent: #2563eb;
+        --accent-soft: #dbeafe;
+        --accent-soft-2: #ecfeff;
+        --bg-page: #eef2f7;
+        --card-bg: #ffffff;
+        --card-radius: 0.8rem;
+        --shadow-soft: 0 14px 30px rgba(15, 23, 42, 0.08);
+        --shadow-light: 0 6px 16px rgba(15, 23, 42, 0.05);
+    }
+
     .stApp {
-        background-color: #f3f4f6;
+        background-color: var(--bg-page);
     }
     .block-container {
         padding-top: 0rem;
         padding-bottom: 1.5rem;
         padding-left: 0rem;
         padding-right: 0rem;
+        max-width: 100%;
     }
+
     .top-bar {
         width: 100%;
-        background: linear-gradient(90deg,#b9f2f0,#dbeafe);
-        border-bottom: 1px solid #cbd5e1;
-        padding: 0.6rem 1.75rem;
+        background: radial-gradient(circle at 0% 0%, #e0f2fe 0, #f1f5f9 50%, #eef2ff 100%);
+        border-bottom: 1px solid #d4d4ff;
+        padding: 0.7rem 1.9rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -134,26 +147,28 @@ st.markdown(
         font-size: 1.1rem;
         font-weight: 650;
         color: #0f172a;
-        letter-spacing: 0.03em;
+        letter-spacing: 0.04em;
     }
     .top-bar-subtitle {
         font-size: 0.8rem;
         color: #1f2933;
     }
+
     .nav-sidebar {
         padding-top: 0.6rem;
         padding-left: 0.75rem;
-        padding-right: 0.25rem;
+        padding-right: 0.35rem;
     }
     .nav-sidebar div[role="radiogroup"] > label {
         display: block;
-        padding: 0.4rem 0.55rem;
+        padding: 0.45rem 0.6rem;
         margin-bottom: 0.45rem;
-        border-radius: 0.4rem;
-        background-color: #ffffff;
+        border-radius: 0.55rem;
+        background-color: rgba(255,255,255,0.85);
         border: 1px solid #e5e7eb;
         cursor: pointer;
         font-size: 0.78rem;
+        box-shadow: var(--shadow-light);
     }
     .nav-sidebar div[role="radiogroup"] > label:hover {
         background-color: #f3f4f6;
@@ -163,15 +178,37 @@ st.markdown(
         display: none;
     }
     .nav-sidebar div[role="radiogroup"] > label[data-baseweb="radio"][aria-checked="true"] {
-        background-color: #e0f2fe;
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 1px rgba(59,130,246,0.4);
+        background: linear-gradient(90deg,#2563eb,#4f46e5);
+        border-color: transparent;
+        color: #f9fafb;
+        box-shadow: 0 0 0 1px rgba(59,130,246,0.6);
     }
+
+    .page-header-card {
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        padding: 0.9rem 1.2rem 0.85rem 1.2rem;
+        margin-top: 0.9rem;
+        margin-bottom: 0.4rem;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid #e5e7eb;
+    }
+    .page-header-title {
+        font-size: 1.05rem;
+        font-weight: 650;
+        color: #111827;
+        margin-bottom: 0.1rem;
+    }
+    .page-header-subtitle {
+        font-size: 0.8rem;
+        color: #6b7280;
+    }
+
     .filter-card {
-        background-color: #ffffff;
+        background-color: var(--card-bg);
         padding: 1.0rem 1.0rem 0.9rem 1.0rem;
-        border-radius: 0.75rem;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        border-radius: var(--card-radius);
+        box-shadow: var(--shadow-soft);
         border: 1px solid #e5e7eb;
         margin-top: 0.75rem;
     }
@@ -195,26 +232,24 @@ st.markdown(
         margin-bottom: 0.18rem;
         margin-top: 0.55rem;
     }
-    .map-summary {
-        text-align: center;
-        font-size: 0.78rem;
-        color: #4b5563;
+
+    .kpi-row {
+        margin-top: 0.7rem;
         margin-bottom: 0.2rem;
-        margin-top: 0.2rem;
     }
     .kpi-card {
         padding: 0.8rem 1.0rem;
-        background-color: #ffffff;
-        border-radius: 0.75rem;
+        background: linear-gradient(135deg,#ffffff,#f5f7ff);
+        border-radius: var(--card-radius);
         border: 1px solid #e5e7eb;
-        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        box-shadow: var(--shadow-soft);
     }
     .kpi-label {
         font-size: 0.75rem;
         color: #6b7280;
         text-transform: uppercase;
         letter-spacing: 0.06em;
-        margin-bottom: 0.15rem;
+        margin-bottom: 0.12rem;
     }
     .kpi-value {
         font-size: 1.15rem;
@@ -225,10 +260,27 @@ st.markdown(
         font-size: 0.75rem;
         color: #6b7280;
     }
+
+    .map-summary {
+        text-align: center;
+        font-size: 0.8rem;
+        color: #4b5563;
+        margin-bottom: 0.4rem;
+        margin-top: 0.3rem;
+    }
+
+    .chart-card {
+        background-color: var(--card-bg);
+        border-radius: var(--card-radius);
+        padding: 0.8rem 1.0rem 0.9rem 1.0rem;
+        margin-top: 0.75rem;
+        box-shadow: var(--shadow-soft);
+        border: 1px solid #e5e7eb;
+    }
     .section-caption {
         font-size: 0.8rem;
         color: #6b7280;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0.35rem;
     }
     .streamlit-expanderHeader {
         font-size: 0.82rem;
@@ -254,7 +306,7 @@ st.markdown(
 # -----------------------------------------------------------
 # Navigation
 # -----------------------------------------------------------
-nav_col, content_col = st.columns([0.08, 0.92])
+nav_col, content_col = st.columns([0.09, 0.91])
 
 with nav_col:
     st.markdown("<div class='nav-sidebar'>", unsafe_allow_html=True)
@@ -294,8 +346,17 @@ with content_col:
     # PAGE 1 – Global Map
     # =======================================================
     if page == "map":
-        st.markdown("### 🗺 Global Air Pollution Map (Interactive)")
-        st.caption("Use the controls on the left to adjust the metric, AQI categories, and minimum AQI threshold.")
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">🗺 Global Air Pollution Map (Interactive)</div>
+                <div class="page-header-subtitle">
+                    Use the controls on the left to adjust the metric, AQI categories, and minimum AQI threshold.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         default_metric_label = (
             "Overall AQI Value"
@@ -303,7 +364,7 @@ with content_col:
             else list(metric_options.keys())[0]
         )
 
-        filters_col, map_col = st.columns([0.26, 0.74])
+        filters_col, map_col = st.columns([0.27, 0.73])
 
         # ---- Filters
         with filters_col:
@@ -382,6 +443,7 @@ with content_col:
                     worst_row = agg.loc[agg[metric_col].idxmax()]
                     best_row = agg.loc[agg[metric_col].idxmin()]
 
+                    st.markdown("<div class='kpi-row'>", unsafe_allow_html=True)
                     k1, k2, k3 = st.columns(3)
                     with k1:
                         st.markdown(
@@ -416,6 +478,7 @@ with content_col:
                             """,
                             unsafe_allow_html=True,
                         )
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                     n_countries = agg["country"].nunique()
                     summary_text = f"Showing {n_countries} countries · Metric: {metric_label}"
@@ -426,6 +489,7 @@ with content_col:
                     vmin = float(agg[metric_col].min())
                     vmax = float(agg[metric_col].max())
 
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     fig = px.choropleth(
                         agg,
                         locations="country",
@@ -444,6 +508,8 @@ with content_col:
                     fig.update_layout(
                         height=610,
                         margin=dict(l=0, r=0, t=10, b=10),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
                         coloraxis_colorbar=dict(
                             title=metric_label,
                             orientation="h",
@@ -454,6 +520,7 @@ with content_col:
                         ),
                     )
                     st.plotly_chart(fig, use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                     with st.expander("Show aggregated data table"):
                         st.dataframe(agg.rename(columns={metric_col: metric_label}))
@@ -462,8 +529,17 @@ with content_col:
     # PAGE 2 – AQI Summary + correlations
     # =======================================================
     elif page == "summary":
-        st.markdown("### 📊 AQI Summary")
-        st.caption("Explore the distribution of any AQI metric and inspect basic statistics and correlations.")
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">📊 AQI Summary</div>
+                <div class="page-header-subtitle">
+                    Explore the distribution of any AQI metric and inspect basic statistics and correlations.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         metric_label = st.selectbox(
             "Metric to summarise",
@@ -475,6 +551,7 @@ with content_col:
         left, right = st.columns([0.52, 0.48])
 
         with left:
+            st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
             st.markdown("#### Distribution")
             fig_hist = px.histogram(
                 base_df,
@@ -482,18 +559,27 @@ with content_col:
                 nbins=40,
                 title=None,
             )
-            fig_hist.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0))
+            fig_hist.update_layout(
+                height=400,
+                margin=dict(l=0, r=0, t=10, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
             st.plotly_chart(fig_hist, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
         with right:
+            st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
             st.markdown("#### Basic statistics")
             desc = base_df[metric_col].describe()[["mean", "std", "min", "25%", "50%", "75%", "max"]]
             st.dataframe(desc.to_frame("value"))
+            st.markdown("</div>", unsafe_allow_html=True)
 
         pollutant_cols = [
             c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
         ]
         if len(pollutant_cols) >= 2:
+            st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
             st.markdown("#### Correlation between pollutant-specific AQI values")
             corr = base_df[pollutant_cols].corr()
             labels = [c.replace("_aqi_value", "").upper() for c in pollutant_cols]
@@ -506,15 +592,30 @@ with content_col:
                 zmax=1,
                 aspect="auto",
             )
-            fig_corr.update_layout(height=400, margin=dict(l=0, r=0, t=10, b=0))
+            fig_corr.update_layout(
+                height=400,
+                margin=dict(l=0, r=0, t=10, b=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
             st.plotly_chart(fig_corr, use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
     # =======================================================
     # PAGE 3 – Country pollutants (multi-country comparison)
     # =======================================================
     elif page == "country":
-        st.markdown("### 🏙 Country Pollutant Breakdown")
-        st.caption("Compare pollutant-specific AQI levels across multiple countries.")
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">🏙 Country Pollutant Breakdown</div>
+                <div class="page-header-subtitle">
+                    Compare pollutant-specific AQI levels across multiple countries.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         if "country" not in base_df.columns:
             st.error("Column 'country' is missing in the dataset.")
@@ -551,6 +652,7 @@ with content_col:
                         long_df["pollutant"].str.replace("_aqi_value", "", regex=False).str.upper()
                     )
 
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     fig_bar = px.bar(
                         long_df,
                         x="country",
@@ -559,9 +661,16 @@ with content_col:
                         barmode="group",
                         labels={"aqi_value": "Average AQI"},
                         title="Average pollutant AQI levels by country",
+                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
-                    fig_bar.update_layout(height=460, margin=dict(l=0, r=0, t=40, b=0))
+                    fig_bar.update_layout(
+                        height=460,
+                        margin=dict(l=0, r=0, t=40, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                    )
                     st.plotly_chart(fig_bar, use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                     with st.expander("Show underlying values"):
                         st.dataframe(long_df)
@@ -570,8 +679,17 @@ with content_col:
     # PAGE 4 – Country Deep Dive (uses both datasets)
     # =======================================================
     elif page == "deep_dive":
-        st.markdown("### 🔍 Country Deep Dive")
-        st.caption("Single-country dashboard with current AQI profile and historical PM2.5 exposure.")
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">🔍 Country Deep Dive</div>
+                <div class="page-header-subtitle">
+                    Single-country dashboard with current AQI profile and historical PM2.5 exposure.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         if pm25_df is None:
             st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
@@ -598,6 +716,7 @@ with content_col:
 
                 # ----- Left: current AQI + pollutant mix
                 with left:
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     st.markdown(f"#### Current Air Quality – {selected_country}")
                     df_c = base_df[base_df["country"] == selected_country]
                     if df_c.empty:
@@ -625,14 +744,24 @@ with content_col:
                                 y="aqi_value",
                                 labels={"aqi_value": "Average AQI"},
                                 title="Average pollutant-specific AQI",
+                                color="pollutant",
+                                color_discrete_sequence=px.colors.qualitative.Set2,
                             )
-                            fig_poll.update_layout(height=350, margin=dict(l=0, r=0, t=45, b=0))
+                            fig_poll.update_layout(
+                                showlegend=False,
+                                height=350,
+                                margin=dict(l=0, r=0, t=45, b=0),
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                plot_bgcolor="rgba(0,0,0,0)",
+                            )
                             st.plotly_chart(fig_poll, use_container_width=True)
                         else:
                             st.write("No pollutant-specific AQI columns to summarise.")
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 # ----- Right: PM2.5 history
                 with right:
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     st.markdown(f"#### PM2.5 Exposure Over Time – {selected_country}")
                     df_pm = pm25_df[pm25_df[pm_country_col] == selected_country].copy()
                     df_pm = df_pm.sort_values(pm_year_col)
@@ -652,23 +781,37 @@ with content_col:
                             markers=True,
                             labels={pm_year_col: "Year", pm_value_col: "PM2.5 (μg/m³)"},
                             title="PM2.5 trend (historical exposure)",
+                            color_discrete_sequence=["#2563eb"],
                         )
-                        fig_pm.update_layout(height=350, margin=dict(l=0, r=0, t=45, b=0))
+                        fig_pm.update_layout(
+                            height=350,
+                            margin=dict(l=0, r=0, t=45, b=0),
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                        )
                         st.plotly_chart(fig_pm, use_container_width=True)
 
                         with st.expander("Show PM2.5 data table"):
                             st.dataframe(df_pm[[pm_country_col, pm_year_col, pm_value_col]])
+                    st.markdown("</div>", unsafe_allow_html=True)
 
     # =======================================================
     # PAGE 5 – DATA LAB (Dynamic Problem + Cleaning)
     # =======================================================
     elif page == "data_lab":
-        st.markdown("### 🧪 Data Lab – Dynamic Problem & Preprocessing")
-        st.caption(
-            "This page demonstrates Method 2 (user-defined analysis): "
-            "you choose how to clean the data, then ask your own questions."
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">🧪 Data Lab – Dynamic Problem &amp; Preprocessing</div>
+                <div class="page-header-subtitle">
+                    Demonstrates Method 2 (user-defined analysis): you choose how to clean the data, then ask your own question.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.markdown("#### 1. Data cleaning & transformation settings")
         clean_col, info_col = st.columns([0.7, 0.3])
 
@@ -759,6 +902,9 @@ with content_col:
             q_high = np.percentile(df_clean[base_metric].dropna(), p_high)
             df_clean = df_clean[(df_clean[base_metric] >= q_low) & (df_clean[base_metric] <= q_high)]
 
+        st.markdown("</div>", unsafe_allow_html=True)  # close cleaning card
+
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.markdown("#### 2. Ask your own question (dynamic analysis)")
 
         # Filters the user can choose for the question
@@ -825,7 +971,6 @@ with content_col:
             if q_type == "How many records match my filters?":
                 count = len(df_q)
                 st.metric("Number of rows that match your filters", count)
-                st.caption("Each row typically represents a city-level observation.")
             elif q_type == "What is the average of the chosen metric?":
                 avg_val = df_q[base_metric].mean()
                 st.metric(f"Average {base_metric} for your filtered subset", f"{avg_val:.2f}")
@@ -845,8 +990,16 @@ with content_col:
                         x="country",
                         y=base_metric,
                         title=f"Top {n} countries by {base_metric}",
+                        color="country",
+                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
-                    fig_top.update_layout(height=420, margin=dict(l=0, r=0, t=40, b=0))
+                    fig_top.update_layout(
+                        height=420,
+                        margin=dict(l=0, r=0, t=40, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        showlegend=False,
+                    )
                     st.plotly_chart(fig_top, use_container_width=True)
             else:
                 # Compare mean metric across selected countries
@@ -859,21 +1012,37 @@ with content_col:
                         x="country",
                         y=base_metric,
                         title=f"Mean {base_metric} for countries in your filtered subset",
+                        color="country",
+                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
-                    fig_cmp.update_layout(height=420, margin=dict(l=0, r=0, t=40, b=0))
+                    fig_cmp.update_layout(
+                        height=420,
+                        margin=dict(l=0, r=0, t=40, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        showlegend=False,
+                    )
                     st.plotly_chart(fig_cmp, use_container_width=True)
 
             with st.expander("Show cleaned & filtered data table"):
                 st.dataframe(df_q)
 
-        # =======================================================
+        st.markdown("</div>", unsafe_allow_html=True)  # close question card
+
+    # =======================================================
     # PAGE 6 – PM2.5 Trends (multi-country comparison)
     # =======================================================
     else:  # page == "pm25"
-        st.markdown("### 📈 PM2.5 Trends (2010–2019)")
-        st.caption(
-            "Inspect long-term PM2.5 exposure trends and compare multiple countries "
-            "on the same chart."
+        st.markdown(
+            """
+            <div class="page-header-card">
+                <div class="page-header-title">📈 PM2.5 Trends (2010–2019)</div>
+                <div class="page-header-subtitle">
+                    Inspect long-term PM2.5 exposure trends and compare multiple countries on the same chart.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
 
         if pm25_df is None:
@@ -906,7 +1075,7 @@ with content_col:
                     df_c = pm25_df[pm25_df[pm_country_col].isin(selected_countries)].copy()
                     df_c = df_c.sort_values(pm_year_col)
 
-                    # Line chart with one line per country
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     fig_line = px.line(
                         df_c,
                         x=pm_year_col,
@@ -915,11 +1084,17 @@ with content_col:
                         markers=True,
                         labels={pm_year_col: "Year", pm_value_col: "PM2.5 (μg/m³)"},
                         title="PM2.5 trend over time – multi-country comparison",
+                        color_discrete_sequence=px.colors.qualitative.Set2,
                     )
-                    fig_line.update_layout(height=440, margin=dict(l=0, r=0, t=40, b=0))
+                    fig_line.update_layout(
+                        height=440,
+                        margin=dict(l=0, r=0, t=40, b=0),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                    )
                     st.plotly_chart(fig_line, use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-                    # Optional small KPI: latest value per country
                     latest = (
                         df_c.sort_values(pm_year_col)
                         .groupby(pm_country_col)
@@ -927,14 +1102,18 @@ with content_col:
                         .sort_values(pm_value_col, ascending=False)
                     )
 
+                    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
                     st.markdown("#### Latest available PM2.5 values by country")
-                    st.dataframe(latest.rename(
-                        columns={
-                            pm_country_col: "Country",
-                            pm_year_col: "Latest year",
-                            pm_value_col: "PM2.5 (μg/m³)",
-                        }
-                    ))
+                    st.dataframe(
+                        latest.rename(
+                            columns={
+                                pm_country_col: "Country",
+                                pm_year_col: "Latest year",
+                                pm_value_col: "PM2.5 (μg/m³)",
+                            }
+                        )
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                     with st.expander("Show full PM2.5 data table used in this view"):
                         st.dataframe(df_c[[pm_country_col, pm_year_col, pm_value_col]])
