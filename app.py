@@ -1,459 +1,538 @@
-import streamlit as st
+import os
+
 import pandas as pd
 import plotly.express as px
+import streamlit as st
 
-# ------------------------------------------------------------------
-# Page config
-# ------------------------------------------------------------------
+# ------------------------------------------------------------
+# BASIC SETUP
+# ------------------------------------------------------------
 st.set_page_config(
     page_title="Global Air Pollution Dashboard",
-    page_icon="🌍",
     layout="wide",
+    page_icon="🌍",
 )
 
-# ------------------------------------------------------------------
-# Minimal styling (cards, spacing, dark theme polish)
-# ------------------------------------------------------------------
+# Global CSS to control layout & styling
 st.markdown(
     """
     <style>
-    /* Tighten top padding a bit so the map can be higher */
+    /* Reduce default padding */
     .block-container {
-        padding-top: 1.2rem;
-        padding-bottom: 1.5rem;
-        padding-left: 1.5rem;
-        padding-right: 1.5rem;
+        padding-top: 0.5rem;
+        padding-left: 0.5rem;
+        padding-right: 1rem;
+        max-width: 100%;
     }
 
-    /* Left filter panel look */
+    body {
+        background-color: #05070c;
+    }
+
+    /* Top header bar */
+    .top-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.25rem 0.5rem 1.25rem;
+        border-bottom: 1px solid #262833;
+        background: transparent;
+        font-family: system-ui, sans-serif;
+    }
+
+    .top-title {
+        font-size: 1.7rem;
+        font-weight: 700;
+        color: #f5f5f7;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+
+    .top-actions {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        display: flex;
+        gap: 0.8rem;
+        align-items: center;
+    }
+
+    .top-pill {
+        border-radius: 999px;
+        padding: 0.4rem 0.8rem;
+        background: #111827;
+        border: 1px solid #27324b;
+    }
+
+    /* Sidebar navigation (left-most column) */
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.6rem;
+        margin-top: 1.4rem;
+    }
+
+    .sidebar-nav .stButton > button {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid #374151;
+        background: #0b1120;
+        color: #e5e7eb;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        padding: 0;
+    }
+
+    .sidebar-nav .stButton > button:hover {
+        border-color: #3b82f6;
+        background: #111827;
+        transform: translateY(-1px);
+    }
+
+    /* Active icon state, we apply via custom class */
+    .nav-active {
+        border-color: #60a5fa !important;
+        background: linear-gradient(135deg, #111827, #1f2937) !important;
+        box-shadow: 0 0 0 1px #1d4ed8;
+    }
+
+    /* Filter card styling */
     .filter-card {
-        background-color: #111827;
-        padding: 1.1rem 1.2rem;
-        border-radius: 0.75rem;
-        box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.20);
+        background: #050814;
+        border-radius: 14px;
+        padding: 0.9rem 1rem 1.1rem 1rem;
+        border: 1px solid #1f2937;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.75);
+    }
+
+    .filter-title-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
     }
 
     .filter-title {
         font-weight: 600;
-        font-size: 1.05rem;
-        margin-bottom: 0.35rem;
+        color: #e5e7eb;
+    }
+
+    .filter-subtitle {
+        font-size: 0.75rem;
+        color: #9ca3af;
     }
 
     .filter-label {
         font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        color: #9ca3af;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: #9CA3AF;
-        margin-bottom: 0.15rem;
+        margin-top: 0.6rem;
+        margin-bottom: 0.2rem;
     }
 
-    /* Small label above map */
+    /* Map summary text */
     .map-summary {
+        margin-top: 0.6rem;
+        margin-bottom: 0.35rem;
         text-align: center;
-        font-size: 0.8rem;
-        color: #D1D5DB;
-        margin-bottom: 0.5rem;
-        margin-top: 0.1rem;
+        font-size: 0.78rem;
+        color: #9ca3af;
     }
 
-    /* Icon menu column: keep it narrow */
-    .css-1lcbmhc, .css-12w0qpk {
-        max-width: 80px !important;
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        font-size: 0.85rem !important;
+    }
+
+    /* Shrink vertical gaps between elements a bit */
+    .stSelectbox, .stMultiSelect, .stSlider {
+        margin-top: 0.15rem;
+        margin-bottom: 0.25rem;
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ------------------------------------------------------------------
-# Data loading
-# ------------------------------------------------------------------
+# ------------------------------------------------------------
+# STATE
+# ------------------------------------------------------------
+if "page" not in st.session_state:
+    st.session_state["page"] = "map"  # default tab
+
+def set_page(page_name: str):
+    st.session_state["page"] = page_name
+
+# ------------------------------------------------------------
+# DATA LOADING
+# ------------------------------------------------------------
 @st.cache_data
 def load_base_data():
-    df = pd.read_csv("data/raw/global_air_pollution.csv")
+    path = "data/raw/global_air_pollution.csv"
+    if not os.path.exists(path):
+        return None, f"CSV not found at {path}"
+    df = pd.read_csv(path)
+
     # Normalise column names
-    df.columns = (
-        df.columns.str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-        .str.replace("(", "", regex=False)
-        .str.replace(")", "", regex=False)
-    )
-    return df
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+
+    # Try to keep only rows with non-null country & aqi_value
+    if "country" in df.columns:
+        df = df[df["country"].notna()]
+    if "aqi_value" in df.columns:
+        df = df[df["aqi_value"].notna()]
+
+    return df, None
 
 
 @st.cache_data
 def load_pm25_data():
-    try:
-        df = pd.read_csv("data/raw/pm25-air-pollution.csv")
-        df.columns = (
-            df.columns.str.strip()
-            .str.lower()
-            .str.replace(" ", "_")
-            .str.replace("(", "", regex=False)
-            .str.replace(")", "", regex=False)
-        )
-        return df
-    except Exception:
+    path = "data/raw/pm25-air-pollution.csv"
+    if not os.path.exists(path):
         return None
+    df = pd.read_csv(path)
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    return df
 
 
-base_df = load_base_data()
+base_df, base_err = load_base_data()
 pm25_df = load_pm25_data()
 
-# ------------------------------------------------------------------
-# Helpers
-# ------------------------------------------------------------------
-def get_metric_options(df: pd.DataFrame):
+# ------------------------------------------------------------
+# HEADER
+# ------------------------------------------------------------
+st.markdown(
     """
-    Build a dict of friendly label -> column name
-    based on what actually exists in the dataset.
-    """
-    col_map = {}
+    <div class="top-header">
+        <div class="top-title">
+            <span>🌍</span>
+            <span>Global Air Pollution Dashboard</span>
+        </div>
+        <div class="top-actions">
+            <div class="top-pill">Interactive • Streamlit</div>
+            <span>Last updated from static dataset</span>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-    if "aqi_value" in df.columns:
-        col_map["Overall AQI Value"] = "aqi_value"
-    if "pm25_aqi_value" in df.columns:
-        col_map["PM2.5 AQI Value"] = "pm25_aqi_value"
-    if "pm10_aqi_value" in df.columns:
-        col_map["PM10 AQI Value"] = "pm10_aqi_value"
-    if "co_aqi_value" in df.columns:
-        col_map["CO AQI Value"] = "co_aqi_value"
-    if "no2_aqi_value" in df.columns:
-        col_map["NO₂ AQI Value"] = "no2_aqi_value"
-    if "o3_aqi_value" in df.columns:
-        col_map["O₃ AQI Value"] = "o3_aqi_value"
+st.write("")  # tiny spacer
 
-    # Fallback: if nothing above exists, just pick any numeric column
-    if not col_map:
-        numeric_cols = df.select_dtypes(include="number").columns.tolist()
-        for c in numeric_cols:
-            pretty = c.replace("_", " ").title()
-            col_map[pretty] = c
+# ------------------------------------------------------------
+# THREE-COLUMN LAYOUT: NAV | FILTERS | MAIN
+# ------------------------------------------------------------
+nav_col, filter_col, main_col = st.columns([0.2, 1.1, 2.7], gap="large")
 
-    return col_map
+# ------------------------- NAV COLUMN ------------------------
+with nav_col:
+    st.markdown("<div class='sidebar-nav'>", unsafe_allow_html=True)
 
-
-# ------------------------------------------------------------------
-# Navigation – vertical icon menu on the far left
-# ------------------------------------------------------------------
-if "active_page" not in st.session_state:
-    st.session_state.active_page = "map"
-
-menu_col, main_col = st.columns([0.08, 0.92])
-
-with menu_col:
-    st.markdown("### ☰")
-
-    choice = st.radio(
-        "Navigation",
-        [
-            "🗺 Global Map",
-            "📊 AQI Summary",
-            "🏙 Country Pollutants",
-            "📈 PM2.5 Trends",
-        ],
-        index=["map", "summary", "country", "pm25"].index(
-            st.session_state.active_page
-        )
-        if st.session_state.active_page in ["map", "summary", "country", "pm25"]
-        else 0,
-        label_visibility="collapsed",
-    )
-
-    if "Global Map" in choice:
-        st.session_state.active_page = "map"
-    elif "AQI Summary" in choice:
-        st.session_state.active_page = "summary"
-    elif "Country Pollutants" in choice:
-        st.session_state.active_page = "country"
-    elif "PM2.5 Trends" in choice:
-        st.session_state.active_page = "pm25"
-
-
-with main_col:
-    # ------------------------------------------------------------------
-    # Title
-    # ------------------------------------------------------------------
-    st.markdown(
-        "<h1 style='margin-bottom: 0.4rem;'>🌍 Global Air Pollution Dashboard</h1>",
-        unsafe_allow_html=True,
-    )
-
-    page = st.session_state.active_page
-
-    # ==============================================================
-    # PAGE 1 – GLOBAL MAP (INTERACTIVE)
-    # ==============================================================
-    if page == "map":
-        metric_options = get_metric_options(base_df)
-        default_metric_label = (
-            "Overall AQI Value"
-            if "Overall AQI Value" in metric_options
-            else list(metric_options.keys())[0]
-        )
-
-        # --------- Layout: Filters (left) | Map (right)
-        filters_col, map_col = st.columns([0.32, 0.68])
-
-        with filters_col:
+    # Helper: add active CSS by injecting a tiny HTML snippet after the button
+    def nav_button(icon, key, page_name, help_text):
+        clicked = st.button(icon, key=key, help=help_text)
+        active = st.session_state["page"] == page_name
+        # Add a tiny HTML span we can grab with CSS if needed (no-op for now)
+        if active:
             st.markdown(
-                "<div class='filter-card'>"
-                "<div class='filter-title'>⚙️ Settings</div>",
+                "<span class='nav-active-marker'></span>",
                 unsafe_allow_html=True,
             )
+        if clicked:
+            set_page(page_name)
+        return active
 
-            # 1. Metric
-            st.markdown(
-                "<div class='filter-label'>Pollution metric</div>",
-                unsafe_allow_html=True,
-            )
+    active_map = nav_button("🌍", "nav_map", "map", "Global Map")
+    active_sum = nav_button("📊", "nav_summary", "summary", "AQI Summary")
+    active_poll = nav_button("🧪", "nav_pollutants", "pollutants", "Country Pollutants")
+    active_trend = nav_button("📈", "nav_pm25", "pm25", "PM2.5 Trends (2010–2019)")
+
+    # Apply active styling via a small JS-free trick:
+    # The nth-child after click gets the 'nav-active' class using CSS trick is tricky;
+    # instead we just rely on Streamlit's rerun and style via index order.
+    # To keep it simple we won't overcomplicate this — selected icon will still show
+    # as pressed and highlighted by Streamlit's focus ring.
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ---------------------- FILTER COLUMN ------------------------
+with filter_col:
+    if base_err:
+        st.error(base_err)
+    else:
+        st.markdown(
+            """
+            <div class="filter-card">
+              <div class="filter-title-bar">
+                 <div class="filter-title">Settings</div>
+              </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # Only show filters that are relevant for each page.
+        # For now, main filter set is for the map & AQI summary pages.
+        if st.session_state["page"] in ("map", "summary"):
+            # Metric options based on available columns
+            metric_candidates = {
+                "Overall AQI Value": "aqi_value",
+                "PM2.5 AQI Value": "pm2_5_aqi_value",
+                "CO AQI Value": "co_aqi_value",
+                "NO₂ AQI Value": "no2_aqi_value",
+                "Ozone AQI Value": "ozone_aqi_value",
+            }
+            available_metric_labels = [
+                label for label, col in metric_candidates.items() if col in base_df.columns
+            ]
+            if not available_metric_labels:
+                available_metric_labels = ["Overall AQI Value"]
+                metric_candidates = {"Overall AQI Value": "aqi_value"}
+
+            st.markdown('<div class="filter-label">Pollution metric</div>', unsafe_allow_html=True)
             metric_label = st.selectbox(
                 "",
-                list(metric_options.keys()),
-                index=list(metric_options.keys()).index(default_metric_label),
-                key="map_metric",
+                available_metric_labels,
+                index=0,
             )
-            metric_col = metric_options[metric_label]
+            metric_col = metric_candidates[metric_label]
 
-            # 2. AQI categories
-            if "aqi_category" in base_df.columns:
-                st.markdown(
-                    "<div class='filter-label' style='margin-top:0.6rem;'>AQI category</div>",
-                    unsafe_allow_html=True,
-                )
-                categories = sorted(base_df["aqi_category"].dropna().unique().tolist())
+            # AQI category multiselect
+            cat_col = "aqi_category"
+            if cat_col in base_df.columns:
+                st.markdown('<div class="filter-label">AQI category</div>', unsafe_allow_html=True)
+                all_cats = sorted(base_df[cat_col].dropna().unique().tolist())
+                default_cats = all_cats[:]  # start with all selected
                 selected_cats = st.multiselect(
                     "",
-                    categories,
-                    default=categories,
-                    key="map_categories",
+                    options=all_cats,
+                    default=default_cats,
                 )
             else:
                 selected_cats = None
 
-            # 3. Min overall AQI threshold (if we have aqi_value at all)
-            if "aqi_value" in base_df.columns:
-                st.markdown(
-                    "<div class='filter-label' style='margin-top:0.6rem;'>Minimum overall AQI value</div>",
-                    unsafe_allow_html=True,
-                )
-                min_val = float(base_df["aqi_value"].min())
-                max_val = float(base_df["aqi_value"].max())
-                min_threshold = st.slider(
+            # Minimum AQI slider
+            st.markdown(
+                '<div class="filter-label">Minimum overall AQI value</div>',
+                unsafe_allow_html=True,
+            )
+            min_aqi = float(
+                st.slider(
                     "",
-                    min_value=float(round(min_val, 1)),
-                    max_value=float(round(max_val, 1)),
-                    value=float(round(min_val, 1)),
+                    min_value=float(base_df[metric_col].min()),
+                    max_value=float(base_df[metric_col].max()),
+                    value=float(base_df[metric_col].min()),
                     step=1.0,
-                    key="map_min_aqi",
                 )
-            else:
-                min_threshold = None
+            )
 
-            st.markdown("</div>", unsafe_allow_html=True)  # close filter-card
+        elif st.session_state["page"] == "pollutants":
+            st.markdown(
+                '<div class="filter-label">Select country</div>',
+                unsafe_allow_html=True,
+            )
+            countries = sorted(base_df["country"].unique().tolist())
+            selected_country = st.selectbox("", countries, index=0)
 
-        # --------------------- MAP COLUMN -------------------------
-        with map_col:
-            df_map = base_df.copy()
-
-            # Apply filters
-            if selected_cats is not None and selected_cats:
-                df_map = df_map[df_map["aqi_category"].isin(selected_cats)]
-
-            if min_threshold is not None and "aqi_value" in df_map.columns:
-                df_map = df_map[df_map["aqi_value"] >= min_threshold]
-
-            # Aggregate by country
-            if "country" not in df_map.columns:
-                st.error("Column 'country' is missing in the dataset.")
-            else:
-                agg = (
-                    df_map.groupby("country", as_index=False)[metric_col]
-                    .mean()
-                    .dropna()
-                )
-
-                n_countries = agg["country"].nunique()
-
-                # Summary text above the map
-                summary_text = f"Showing {n_countries} countries · Metric: {metric_label}"
-                if min_threshold is not None:
-                    summary_text += f" · Min overall AQI: {min_threshold:.0f}"
-
+        elif st.session_state["page"] == "pm25":
+            if pm25_df is None:
                 st.markdown(
-                    f"<div class='map-summary'>{summary_text}</div>",
+                    "<span style='font-size:0.8rem;color:#f97373;'>PM2.5 trend dataset not found.</span>",
                     unsafe_allow_html=True,
                 )
-
-                # Build choropleth
-                vmin = float(agg[metric_col].min())
-                vmax = float(agg[metric_col].max())
-
-                fig = px.choropleth(
-                    agg,
-                    locations="country",
-                    locationmode="country names",
-                    color=metric_col,
-                    color_continuous_scale="Blues",
-                    range_color=(vmin, vmax),
+            else:
+                st.markdown(
+                    '<div class="filter-label">Select country</div>',
+                    unsafe_allow_html=True,
                 )
+                countries = sorted(pm25_df["country"].unique().tolist())
+                selected_trend_country = st.selectbox("", countries, index=0)
 
-                fig.update_layout(
-                    height=560,
-                    margin=dict(l=0, r=0, t=10, b=0),
-                    coloraxis_colorbar=dict(
-                        title=metric_label,
-                        orientation="h",
-                        y=-0.18,
-                        x=0.5,
-                        thickness=10,
-                        len=0.7,
-                    ),
-                )
+        # Close filter card container
+        st.markdown("</div>", unsafe_allow_html=True)
 
-                st.plotly_chart(fig, use_container_width=True)
+# ---------------------- MAIN / MAP COLUMN --------------------
+with main_col:
+    if base_err:
+        st.stop()
 
-                with st.expander("Show aggregated data table"):
-                    st.dataframe(
-                        agg.rename(columns={metric_col: metric_label}),
-                    )
+    page = st.session_state["page"]
 
-    # ==============================================================
-    # PAGE 2 – AQI SUMMARY
-    # ==============================================================
-    elif page == "summary":
-        st.subheader("📊 AQI Summary (Method 1)")
+    # ------------------ PAGE 1: GLOBAL MAP -------------------
+    if page == "map":
+        df = base_df.copy()
 
-        metric_options = get_metric_options(base_df)
-        metric_label = st.selectbox(
-            "Metric to summarise", list(metric_options.keys()), key="summary_metric"
+        # Apply filters
+        if selected_cats is not None:
+            df = df[df["aqi_category"].isin(selected_cats)]
+        df = df[df[metric_col] >= min_aqi]
+
+        # Aggregate by country
+        grouped = (
+            df.groupby("country", as_index=False)[metric_col]
+            .mean()
+            .rename(columns={metric_col: "metric_value"})
         )
-        metric_col = metric_options[metric_label]
 
-        left, right = st.columns([0.5, 0.5])
+        num_countries = grouped["country"].nunique()
+        summary_text = (
+            f"Showing {num_countries} countries · Metric: {metric_label} · "
+            f"Min overall AQI: {min_aqi:.0f}"
+        )
 
-        with left:
-            st.markdown("#### Distribution")
-            st.write(
-                "Histogram of the selected metric across all cities/countries "
-                "(helps see typical air quality levels and outliers)."
+        st.markdown(
+            f"<div class='map-summary'>{summary_text}</div>",
+            unsafe_allow_html=True,
+        )
+
+        if grouped.empty:
+            st.warning("No data matches the current filters.")
+        else:
+            fig = px.choropleth(
+                grouped,
+                locations="country",
+                locationmode="country names",
+                color="metric_value",
+                hover_name="country",
+                color_continuous_scale="Blues",
+                labels={"metric_value": metric_label},
             )
-            fig_hist = px.histogram(
-                base_df,
-                x=metric_col,
-                nbins=40,
-                title=None,
-            )
-            fig_hist.update_layout(
-                height=400,
+
+            fig.update_layout(
+                height=520,
                 margin=dict(l=0, r=0, t=10, b=0),
+                coloraxis_colorbar=dict(
+                    title=metric_label,
+                    orientation="h",
+                    y=-0.18,
+                    x=0.5,
+                    xanchor="center",
+                ),
             )
-            st.plotly_chart(fig_hist, use_container_width=True)
 
-        with right:
-            st.markdown("#### Basic statistics")
-            desc = base_df[metric_col].describe()[["mean", "std", "min", "25%", "50%", "75%", "max"]]
-            st.dataframe(desc.to_frame("value"))
+            st.plotly_chart(fig, use_container_width=True)
 
-    # ==============================================================
-    # PAGE 3 – COUNTRY POLLUTANTS
-    # ==============================================================
-    elif page == "country":
-        st.subheader("🏙 Country Pollutant Breakdown")
+            # Aggregated table
+            with st.expander("Show aggregated data table"):
+                st.dataframe(
+                    grouped.sort_values("metric_value", ascending=False),
+                    use_container_width=True,
+                )
 
-        if "country" not in base_df.columns:
-            st.error("Column 'country' is missing in the dataset.")
+    # --------------- PAGE 2: AQI SUMMARY ---------------------
+    elif page == "summary":
+        st.markdown(
+            "<div class='map-summary'>Summary of AQI distribution by category.</div>",
+            unsafe_allow_html=True,
+        )
+
+        if "aqi_category" not in base_df.columns:
+            st.warning("AQI category column not found in dataset.")
         else:
-            countries = sorted(base_df["country"].dropna().unique().tolist())
-            selected_country = st.selectbox(
-                "Choose a country", countries, key="country_select"
+            summary = (
+                base_df.groupby("aqi_category", as_index=False)["aqi_value"]
+                .mean()
+                .rename(columns={"aqi_value": "avg_aqi"})
             )
 
-            df_c = base_df[base_df["country"] == selected_country]
+            fig = px.bar(
+                summary,
+                x="aqi_category",
+                y="avg_aqi",
+                labels={"aqi_category": "AQI Category", "avg_aqi": "Average AQI"},
+            )
+            fig.update_layout(
+                xaxis_title="AQI Category",
+                yaxis_title="Average AQI",
+                height=520,
+                margin=dict(l=20, r=20, t=40, b=40),
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-            pollutant_cols = [
-                c
-                for c in base_df.columns
-                if "_aqi_value" in c and c != "aqi_value"
-            ]
+            with st.expander("Show summary table"):
+                st.dataframe(summary, use_container_width=True)
 
-            if not pollutant_cols:
-                st.warning("No pollutant-specific AQI columns found in the dataset.")
-            else:
-                avg_pollutants = df_c[pollutant_cols].mean().reset_index()
-                avg_pollutants.columns = ["pollutant", "aqi_value"]
+    # --------------- PAGE 3: COUNTRY POLLUTANTS --------------
+    elif page == "pollutants":
+        st.markdown(
+            "<div class='map-summary'>Average pollutant-specific AQI for a selected country.</div>",
+            unsafe_allow_html=True,
+        )
 
-                avg_pollutants["pollutant"] = avg_pollutants["pollutant"].str.replace(
-                    "_aqi_value", "", regex=False
-                ).str.upper()
+        df_country = base_df[base_df["country"] == selected_country]
 
-                fig_bar = px.bar(
-                    avg_pollutants,
-                    x="pollutant",
-                    y="aqi_value",
-                    labels={"aqi_value": "Average AQI"},
-                    title=f"Average pollutant AQI levels in {selected_country}",
-                )
-                fig_bar.update_layout(
-                    height=440,
-                    margin=dict(l=0, r=0, t=40, b=0),
-                )
+        pollutant_cols = [
+            c for c in base_df.columns if c.endswith("_aqi_value") and c != "aqi_value"
+        ]
+        if not pollutant_cols:
+            st.warning("No pollutant-specific AQI columns detected.")
+        else:
+            pollutant_data = (
+                df_country[pollutant_cols]
+                .mean()
+                .reset_index()
+                .rename(columns={"index": "pollutant", 0: "avg_aqi"})
+            )
+            pollutant_data["pollutant"] = pollutant_data["pollutant"].str.replace(
+                "_aqi_value", ""
+            ).str.upper()
 
-                st.plotly_chart(fig_bar, use_container_width=True)
+            fig = px.bar(
+                pollutant_data,
+                x="pollutant",
+                y="avg_aqi",
+                labels={"avg_aqi": "Average AQI"},
+            )
+            fig.update_layout(
+                title=f"Pollutant AQI for {selected_country}",
+                height=520,
+                margin=dict(l=20, r=20, t=60, b=40),
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-                with st.expander("Show underlying values"):
-                    st.dataframe(avg_pollutants)
+            with st.expander("Show pollutant table"):
+                st.dataframe(pollutant_data, use_container_width=True)
 
-    # ==============================================================
-    # PAGE 4 – PM2.5 TRENDS (2010–2019)
-    # ==============================================================
+    # --------------- PAGE 4: PM2.5 TRENDS --------------------
     elif page == "pm25":
-        st.subheader("📈 PM2.5 Trends (2010–2019)")
-
         if pm25_df is None:
-            st.warning(
-                "The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in "
-                "`data/raw/`. Please add it to enable this tab."
-            )
+            st.warning("PM2.5 trend dataset not available.")
         else:
-            # Expecting columns like: country, year, pm25 or similar
-            # Try to infer reasonable column names
-            candidate_country = "country" if "country" in pm25_df.columns else pm25_df.columns[0]
-            candidate_year = "year" if "year" in pm25_df.columns else pm25_df.columns[1]
+            st.markdown(
+                (
+                    "<div class='map-summary'>"
+                    "PM2.5 trend over time for the selected country (2010–2019, if available)."
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
 
-            numeric_cols = pm25_df.select_dtypes(include="number").columns.tolist()
-            # Remove year if numeric
-            if candidate_year in numeric_cols:
-                numeric_cols.remove(candidate_year)
-            pm_col = numeric_cols[0] if numeric_cols else None
-
-            if not pm_col:
-                st.error("Could not find a numeric PM2.5 column in the PM dataset.")
+            df_c = pm25_df[pm25_df["country"] == selected_trend_country]
+            if "year" not in df_c.columns:
+                st.warning("Year column not found in PM2.5 dataset.")
             else:
-                countries = sorted(pm25_df[candidate_country].dropna().unique().tolist())
-                selected_country = st.selectbox(
-                    "Choose a country", countries, key="pm25_country"
-                )
+                val_col = [c for c in df_c.columns if c not in ("country", "year")]
+                if not val_col:
+                    st.warning("No PM2.5 numeric column detected.")
+                else:
+                    val_col = val_col[0]
+                    fig = px.line(
+                        df_c.sort_values("year"),
+                        x="year",
+                        y=val_col,
+                        markers=True,
+                        labels={"year": "Year", val_col: "PM2.5"},
+                    )
+                    fig.update_layout(
+                        title=f"PM2.5 Trend for {selected_trend_country}",
+                        height=520,
+                        margin=dict(l=20, r=20, t=60, b=40),
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
 
-                df_c = pm25_df[pm25_df[candidate_country] == selected_country].copy()
-                df_c = df_c.sort_values(candidate_year)
-
-                fig_line = px.line(
-                    df_c,
-                    x=candidate_year,
-                    y=pm_col,
-                    markers=True,
-                    labels={candidate_year: "Year", pm_col: "PM2.5"},
-                    title=f"PM2.5 trend over time – {selected_country}",
-                )
-
-                fig_line.update_layout(
-                    height=440,
-                    margin=dict(l=0, r=0, t=40, b=0),
-                )
-
-                st.plotly_chart(fig_line, use_container_width=True)
-
-                with st.expander("Show data table"):
-                    st.dataframe(df_c[[candidate_country, candidate_year, pm_col]])
+                    with st.expander("Show PM2.5 data"):
+                        st.dataframe(df_c[["year", val_col]], use_container_width=True)
