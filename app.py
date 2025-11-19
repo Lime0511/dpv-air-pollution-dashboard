@@ -866,12 +866,15 @@ with content_col:
             with st.expander("Show cleaned & filtered data table"):
                 st.dataframe(df_q)
 
-    # =======================================================
-    # PAGE 6 – PM2.5 Trends (simple)
+        # =======================================================
+    # PAGE 6 – PM2.5 Trends (multi-country comparison)
     # =======================================================
     else:  # page == "pm25"
         st.markdown("### 📈 PM2.5 Trends (2010–2019)")
-        st.caption("Inspect long-term PM2.5 exposure trends for any country in the PM2.5 dataset.")
+        st.caption(
+            "Inspect long-term PM2.5 exposure trends and compare multiple countries "
+            "on the same chart."
+        )
 
         if pm25_df is None:
             st.warning("The PM2.5 dataset (`pm25-air-pollution.csv`) was not found in `data/raw/`.")
@@ -888,24 +891,50 @@ with content_col:
                 st.error("Could not find a numeric PM2.5 column in `pm25-air-pollution.csv`.")
             else:
                 countries = sorted(pm25_df[pm_country_col].dropna().unique().tolist())
-                selected_country = st.selectbox("Choose a country", countries, key="pm25_country")
+                default_countries = countries[:3] if len(countries) >= 3 else countries
 
-                df_c = pm25_df[pm25_df[pm_country_col] == selected_country].copy()
-                df_c = df_c.sort_values(pm_year_col)
+                selected_countries = st.multiselect(
+                    "Choose countries to compare",
+                    countries,
+                    default=default_countries,
+                    key="pm25_countries",
+                )
 
-                if df_c.empty:
-                    st.info("No PM2.5 data available for this country.")
+                if not selected_countries:
+                    st.info("Select at least one country to display the trend.")
                 else:
+                    df_c = pm25_df[pm25_df[pm_country_col].isin(selected_countries)].copy()
+                    df_c = df_c.sort_values(pm_year_col)
+
+                    # Line chart with one line per country
                     fig_line = px.line(
                         df_c,
                         x=pm_year_col,
                         y=pm_value_col,
+                        color=pm_country_col,
                         markers=True,
                         labels={pm_year_col: "Year", pm_value_col: "PM2.5 (μg/m³)"},
-                        title=f"PM2.5 trend over time – {selected_country}",
+                        title="PM2.5 trend over time – multi-country comparison",
                     )
                     fig_line.update_layout(height=440, margin=dict(l=0, r=0, t=40, b=0))
                     st.plotly_chart(fig_line, use_container_width=True)
 
-                    with st.expander("Show data table"):
+                    # Optional small KPI: latest value per country
+                    latest = (
+                        df_c.sort_values(pm_year_col)
+                        .groupby(pm_country_col)
+                        .tail(1)[[pm_country_col, pm_year_col, pm_value_col]]
+                        .sort_values(pm_value_col, ascending=False)
+                    )
+
+                    st.markdown("#### Latest available PM2.5 values by country")
+                    st.dataframe(latest.rename(
+                        columns={
+                            pm_country_col: "Country",
+                            pm_year_col: "Latest year",
+                            pm_value_col: "PM2.5 (μg/m³)",
+                        }
+                    ))
+
+                    with st.expander("Show full PM2.5 data table used in this view"):
                         st.dataframe(df_c[[pm_country_col, pm_year_col, pm_value_col]])
